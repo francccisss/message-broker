@@ -31,7 +31,7 @@ type Queue struct {
 	Body       string
 }
 
-type Send struct {
+type EPMessage struct {
 	Type       string
 	Route      string
 	HeaderSize int

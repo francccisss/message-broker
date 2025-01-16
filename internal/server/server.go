@@ -53,15 +53,12 @@ func HandleConnections(c net.Conn) {
 
 	// type assertion switch statement for different processing
 	switch endpointMsg.Type {
-	case "Send":
+	case "EPMEssage":
 		fmt.Printf("Message is of type: %s\n", endpointMsg.Type)
 		fmt.Printf("Message: %+v \n", endpointMsg)
 
+		// Creating/Asserting message queue
 	case "Assert":
-		fmt.Printf("Message is of type: %s\n", endpointMsg.Type)
-		fmt.Printf("Message: %+v \n", endpointMsg)
-
-	case "Receive":
 		fmt.Printf("Message is of type: %s\n", endpointMsg.Type)
 		fmt.Printf("Message: %+v \n", endpointMsg)
 
@@ -69,6 +66,21 @@ func HandleConnections(c net.Conn) {
 		fmt.Println("Unidentified type")
 		c.Write([]byte("Unidentified type: Types should consist of Send | Assert | Receive"))
 	}
+}
+
+type MessageHandler struct {
+}
+
+type Handler interface {
+	HandleQueueAssert()
+}
+
+func (mh MessageHandler) HandleQueueAssert() {
+
+}
+
+func (mh MessageHandler) HandleEPMessage() {
+
 }
 
 func ParseMessage[T any](b []byte) (T, error) {

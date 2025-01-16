@@ -47,8 +47,8 @@ func TestServerConnections(t *testing.T) {
 
 func TestProtocolParsing(t *testing.T) {
 	log.Println("Start protocol parsing test")
-	endpointMessage := server.Send{
-		Type:       "Send",
+	endpointMessage := server.EPMessage{
+		Type:       "EPMessage",
 		Route:      "Somewhere",
 		HeaderSize: 1024,
 		Body:       "This is a message sent by a client",
@@ -67,15 +67,11 @@ func TestProtocolParsing(t *testing.T) {
 	}
 	// Message Dispatcher
 	switch endpointMsg.Type {
-	case "Send":
+	case "EPMessage":
 		fmt.Printf("Message is of type: %s\n", endpointMsg.Type)
 		fmt.Printf("Message: %+v \n", endpointMessage)
 
 	case "Assert":
-		fmt.Printf("Message is of type: %s\n", endpointMsg.Type)
-		fmt.Printf("Message: %+v \n", endpointMessage)
-
-	case "Receive":
 		fmt.Printf("Message is of type: %s\n", endpointMsg.Type)
 		fmt.Printf("Message: %+v \n", endpointMessage)
 
