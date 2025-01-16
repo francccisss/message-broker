@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"message-broker/internal/server"
 	"net"
@@ -28,6 +29,7 @@ func TestServerConnections(t *testing.T) {
 				state <- false
 			}
 			log.Printf("Connected %s", conn.RemoteAddr())
+			go server.HandleConnections(conn)
 		}
 	}(ln, serverState)
 
@@ -42,6 +44,44 @@ func TestServerConnections(t *testing.T) {
 			t.Fatalf("Unable to listen to client connections")
 		}
 	}
+}
+
+func createClients(num int) {
+	var wg sync.WaitGroup
+	for i := range num {
+		wg.Add(i)
+		go func(i int) {
+			defer wg.Done()
+
+			conn, err := net.Dial("tcp", "localhost:8080")
+			log.Printf("Client connected %d", i)
+			if err != nil {
+				log.Fatalf(err.Error())
+			}
+			defer conn.Close()
+
+			endpointMessage := server.EPMessage{
+				Type:       "EPMessage",
+				Route:      "Somewhere",
+				HeaderSize: 1024,
+				Body:       "This is a message sent by a client",
+			}
+
+			b, err := json.Marshal(endpointMessage)
+
+			if err != nil {
+				log.Println(err.Error())
+				return
+			}
+			_, err = conn.Write(b)
+			if err != nil {
+				log.Println(err.Error())
+				return
+			}
+		}(i)
+	}
+	wg.Wait()
+	log.Printf("Done")
 }
 
 func TestProtocolParsing(t *testing.T) {
@@ -65,6 +105,7 @@ func TestProtocolParsing(t *testing.T) {
 
 	}
 	ep := server.Endpoint{}
+	fmt.Println(endpointMsg)
 	// Message Dispatcher
 	switch msg := endpointMsg.(type) {
 	case server.EPMessage:
@@ -75,28 +116,4 @@ func TestProtocolParsing(t *testing.T) {
 		t.Fatalf("Not any type")
 	}
 
-}
-
-func createClients(num int) {
-	var wg sync.WaitGroup
-	for i := range num {
-		wg.Add(i)
-		go func(i int) {
-			defer wg.Done()
-
-			conn, err := net.Dial("tcp", "localhost:8080")
-			log.Printf("Client connected %d", i)
-			if err != nil {
-				log.Fatalf(err.Error())
-			}
-
-			defer conn.Close()
-			t := time.Duration(i) * time.Millisecond
-			log.Printf("Time to sleep %d", t)
-			time.Sleep(t)
-			log.Printf("Wake up thread")
-		}(i)
-	}
-	wg.Wait()
-	log.Printf("Done")
 }

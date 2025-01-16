@@ -34,14 +34,12 @@ func HandleConnections(c net.Conn) {
 	defer c.Close()
 	ep := Endpoint{}
 	readBuf := make([]byte, 1024)
-	_, err := c.Read(readBuf)
-
+	bytesRead, err := c.Read(readBuf)
 	if err != nil {
 		log.Println(err.Error())
 		return
 	}
-
-	endpointMsg, err := ParseMessage(readBuf)
+	endpointMsg, err := ParseMessage(readBuf[:bytesRead])
 	if err != nil {
 		log.Printf("Unable to parse message")
 		log.Println(err.Error())
@@ -53,14 +51,11 @@ func HandleConnections(c net.Conn) {
 	switch msg := endpointMsg.(type) {
 	case EPMessage:
 		ep.HandleEPMessage(msg)
-
-		// Creating/Asserting message queue
 	case Queue:
 		ep.HandleQueueAssert(msg)
-
 	default:
 		fmt.Println("Unidentified type")
-		c.Write([]byte("Unidentified type: Types should consist of Send | Assert | Receive"))
+		c.Write([]byte("Unidentified type: Types should consist of EPMessage | Queue "))
 	}
 }
 
@@ -99,11 +94,31 @@ func (ep Endpoint) HandleEPMessage(m EPMessage) {
 	fmt.Printf("Send message to Route: %+v \n", m.Route)
 }
 
+// Unmasrshalling returns a generic interface not `interface{}`
+// need to hardcode type assertion using internal property "Type"
+
 func ParseMessage(b []byte) (interface{}, error) {
-	var v interface{}
-	err := json.Unmarshal(b, &v)
-	if err != nil {
-		return v, err
+	var temp map[string]interface{}
+	if err := json.Unmarshal(b, &temp); err != nil {
+		return nil, err
 	}
-	return v, err
+
+	switch temp["Type"] {
+	case "EPMessage":
+		var epMsg EPMessage
+		err := json.Unmarshal(b, &epMsg)
+		if err != nil {
+			return nil, err
+		}
+		return epMsg, nil
+	case "Queue":
+		var q Queue
+		err := json.Unmarshal(b, &q)
+		if err != nil {
+			return nil, err
+		}
+		return q, nil
+	default:
+		return temp, fmt.Errorf("Not of any known message type")
+	}
 }
