@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	protocol "message-broker/internal"
+	"message-broker/internal/endpoint.go"
 	"message-broker/internal/server"
 	"net"
 	"sync"
@@ -60,7 +62,7 @@ func createClients(num int) {
 			}
 			defer conn.Close()
 
-			endpointMessage := server.EPMessage{
+			endpointMessage := protocol.EPMessage{
 				Type:       "EPMessage",
 				Route:      "Somewhere",
 				HeaderSize: 1024,
@@ -86,7 +88,7 @@ func createClients(num int) {
 
 func TestProtocolParsing(t *testing.T) {
 	log.Println("Start protocol parsing test")
-	endpointMessage := server.EPMessage{
+	endpointMessage := protocol.EPMessage{
 		Type:       "EPMessage",
 		Route:      "Somewhere",
 		HeaderSize: 1024,
@@ -104,13 +106,13 @@ func TestProtocolParsing(t *testing.T) {
 		t.Fatalf("Unable to Marshal endpoint message")
 
 	}
-	ep := server.Endpoint{}
+	ep := client.Endpoint{}
 	fmt.Println(endpointMsg)
 	// Message Dispatcher
 	switch msg := endpointMsg.(type) {
-	case server.EPMessage:
+	case protocol.EPMessage:
 		ep.HandleEPMessage(msg)
-	case server.Queue:
+	case protocol.Queue:
 		ep.HandleQueueAssert(msg)
 	default:
 		t.Fatalf("Not any type")

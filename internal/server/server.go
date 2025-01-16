@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	protocol "message-broker/internal"
+	client "message-broker/internal/endpoint.go"
 	"net"
 )
-
-const HEADER_SIZE = 1024
 
 type Server struct {
 	addr string
@@ -31,12 +31,12 @@ func (s Server) ServeTCP() (net.Listener, error) {
 // Read Headers
 func HandleConnections(c net.Conn) {
 
-	defer c.Close()
-	ep := Endpoint{}
+	ep := client.Endpoint{}
 	readBuf := make([]byte, 1024)
 	bytesRead, err := c.Read(readBuf)
 	if err != nil {
 		log.Println(err.Error())
+		c.Write([]byte("Unable to read message"))
 		return
 	}
 	endpointMsg, err := ParseMessage(readBuf[:bytesRead])
@@ -49,49 +49,14 @@ func HandleConnections(c net.Conn) {
 
 	// type assertion switch statement for different processing
 	switch msg := endpointMsg.(type) {
-	case EPMessage:
+	case protocol.EPMessage:
 		ep.HandleEPMessage(msg)
-	case Queue:
+	case protocol.Queue:
 		ep.HandleQueueAssert(msg)
 	default:
 		fmt.Println("Unidentified type")
 		c.Write([]byte("Unidentified type: Types should consist of EPMessage | Queue "))
 	}
-}
-
-/*
- Endpoint is an abstraction of a connected application using an endpoint API
- on the client side for connecting to the server
-*/
-
-type Endpoint struct {
-}
-
-type EPHandler interface {
-	HandleQueueAssert()
-	HandleEPMessage()
-}
-
-/*
- Create an entry in a hashmap for a new Message queue
-*/
-
-func (ep Endpoint) HandleQueueAssert(m Queue) {
-	fmt.Printf("Message is of type: %s\n", m.Type)
-	fmt.Printf("Creating/Asserting Queue with Route: %+v \n", m.QueueHeader.Name)
-}
-
-/*
-Route the EPMessage to the appropriate channel described in the current
-EPMessages' header data
-Use the Route property of the EPMessage to locate the appropriate Route within
-the Route Map
-*/
-
-func (ep Endpoint) HandleEPMessage(m EPMessage) {
-	fmt.Printf("Message is of type: %s\n", m.Type)
-	fmt.Printf("Message: %+v \n", m)
-	fmt.Printf("Send message to Route: %+v \n", m.Route)
 }
 
 // Unmasrshalling returns a generic interface not `interface{}`
@@ -105,14 +70,14 @@ func ParseMessage(b []byte) (interface{}, error) {
 
 	switch temp["Type"] {
 	case "EPMessage":
-		var epMsg EPMessage
+		var epMsg protocol.EPMessage
 		err := json.Unmarshal(b, &epMsg)
 		if err != nil {
 			return nil, err
 		}
 		return epMsg, nil
 	case "Queue":
-		var q Queue
+		var q protocol.Queue
 		err := json.Unmarshal(b, &q)
 		if err != nil {
 			return nil, err

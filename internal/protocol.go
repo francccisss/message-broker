@@ -1,6 +1,10 @@
-package server
+package protocol
 
 /*
+
+A Protocol defines the set of rules for two endpoints to communicate, client to server,
+server to client, or client to client through C -> S -> C.
+
 Max Header size 1kb
 Body undecided size?
 
