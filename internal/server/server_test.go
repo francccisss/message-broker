@@ -58,14 +58,31 @@ func TestProtocolParsing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unable to Marshal endpoint message")
 	}
-	endpointMsg, err := server.ParseMessage[server.Send](b)
+	// Should return an abstract message with a Type
+	endpointMsg, err := server.ParseMessage[struct{ Type string }](b)
 	if err != nil {
 		log.Println(err.Error())
 		t.Fatalf("Unable to Marshal endpoint message")
 
 	}
+	// Message Dispatcher
+	switch endpointMsg.Type {
+	case "Send":
+		fmt.Printf("Message is of type: %s\n", endpointMsg.Type)
+		fmt.Printf("Message: %+v \n", endpointMessage)
 
-	fmt.Printf("Message: %+v \n", endpointMsg)
+	case "Assert":
+		fmt.Printf("Message is of type: %s\n", endpointMsg.Type)
+		fmt.Printf("Message: %+v \n", endpointMessage)
+
+	case "Receive":
+		fmt.Printf("Message is of type: %s\n", endpointMsg.Type)
+		fmt.Printf("Message: %+v \n", endpointMessage)
+
+	default:
+		fmt.Println("Not any type")
+	}
+
 }
 
 func createClients(num int) {

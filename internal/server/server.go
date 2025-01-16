@@ -40,7 +40,10 @@ func HandleConnections(c net.Conn) {
 		return
 	}
 
-	endpointMessage, err := ParseMessage[any](readBuf)
+	endpointMsg, err := ParseMessage[struct {
+		Type string
+		Body string
+	}](readBuf)
 	if err != nil {
 		log.Printf("Unable to parse message")
 		log.Println(err.Error())
@@ -49,8 +52,23 @@ func HandleConnections(c net.Conn) {
 	}
 
 	// type assertion switch statement for different processing
+	switch endpointMsg.Type {
+	case "Send":
+		fmt.Printf("Message is of type: %s\n", endpointMsg.Type)
+		fmt.Printf("Message: %+v \n", endpointMsg)
 
-	fmt.Printf("Message: %+v \n", endpointMessage)
+	case "Assert":
+		fmt.Printf("Message is of type: %s\n", endpointMsg.Type)
+		fmt.Printf("Message: %+v \n", endpointMsg)
+
+	case "Receive":
+		fmt.Printf("Message is of type: %s\n", endpointMsg.Type)
+		fmt.Printf("Message: %+v \n", endpointMsg)
+
+	default:
+		fmt.Println("Unidentified type")
+		c.Write([]byte("Unidentified type: Types should consist of Send | Assert | Receive"))
+	}
 }
 
 func ParseMessage[T any](b []byte) (T, error) {
