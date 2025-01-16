@@ -24,14 +24,16 @@ type QueueHeader struct {
 	Durable bool
 }
 
-type CreateQueueHeader struct {
+type Queue struct {
 	Type string
 	QueueHeader
 	HeaderSize int
+	Body       string
 }
 
-type SendHeader struct {
+type Send struct {
 	Type       string
 	Route      string
 	HeaderSize int
+	Body       string
 }

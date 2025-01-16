@@ -1,9 +1,9 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
-	"message-broker/internal/helper"
 	"net"
 )
 
@@ -40,7 +40,7 @@ func HandleConnections(c net.Conn) {
 		return
 	}
 
-	header, body, err := extractMessage(readBuf)
+	endpointMessage, err := ParseMessage[any](readBuf)
 	if err != nil {
 		log.Printf("Unable to parse message")
 		log.Println(err.Error())
@@ -48,17 +48,16 @@ func HandleConnections(c net.Conn) {
 		return
 	}
 
-	fmt.Printf("Header: %+v \n", header)
-	fmt.Printf("Body: %+s\n", body)
+	// type assertion switch statement for different processing
+
+	fmt.Printf("Message: %+v \n", endpointMessage)
 }
 
-// Generic function for extracting at a fixed size slice to be returned
-func extractMessage(b []byte) (interface{}, string, error) {
-	header := b[0:HEADER_SIZE]
-	body := string(b[HEADER_SIZE:])
-	headerUnmarshalled, err := helper.ParseIncomingHeader(header)
+func ParseMessage[T any](b []byte) (T, error) {
+	var v T
+	err := json.Unmarshal(b, &v)
 	if err != nil {
-		return nil, "", err
+		return v, err
 	}
-	return headerUnmarshalled, body, nil
+	return v, err
 }

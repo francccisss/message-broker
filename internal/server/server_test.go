@@ -1,6 +1,8 @@
 package server_test
 
 import (
+	"encoding/json"
+	"fmt"
 	"log"
 	"message-broker/internal/server"
 	"net"
@@ -41,6 +43,29 @@ func TestServerConnections(t *testing.T) {
 			t.Fatalf("Unable to listen to client connections")
 		}
 	}
+}
+
+func TestProtocolParsing(t *testing.T) {
+	log.Println("Start protocol parsing test")
+	endpointMessage := server.Send{
+		Type:       "Send",
+		Route:      "Somewhere",
+		HeaderSize: 1024,
+		Body:       "This is a message sent by a client",
+	}
+
+	b, err := json.Marshal(endpointMessage)
+	if err != nil {
+		t.Fatalf("Unable to Marshal endpoint message")
+	}
+	endpointMsg, err := server.ParseMessage[server.Send](b)
+	if err != nil {
+		log.Println(err.Error())
+		t.Fatalf("Unable to Marshal endpoint message")
+
+	}
+
+	fmt.Printf("Message: %+v \n", endpointMsg)
 }
 
 func createClients(num int) {
