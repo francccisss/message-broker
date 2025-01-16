@@ -2,7 +2,6 @@ package server_test
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"message-broker/internal/server"
 	"net"
@@ -59,24 +58,21 @@ func TestProtocolParsing(t *testing.T) {
 		t.Fatalf("Unable to Marshal endpoint message")
 	}
 	// Should return an abstract message with a Type
-	endpointMsg, err := server.ParseMessage[struct{ Type string }](b)
+	endpointMsg, err := server.ParseMessage(b)
 	if err != nil {
 		log.Println(err.Error())
 		t.Fatalf("Unable to Marshal endpoint message")
 
 	}
+	ep := server.Endpoint{}
 	// Message Dispatcher
-	switch endpointMsg.Type {
-	case "EPMessage":
-		fmt.Printf("Message is of type: %s\n", endpointMsg.Type)
-		fmt.Printf("Message: %+v \n", endpointMessage)
-
-	case "Assert":
-		fmt.Printf("Message is of type: %s\n", endpointMsg.Type)
-		fmt.Printf("Message: %+v \n", endpointMessage)
-
+	switch msg := endpointMsg.(type) {
+	case server.EPMessage:
+		ep.HandleEPMessage(msg)
+	case server.Queue:
+		ep.HandleQueueAssert(msg)
 	default:
-		fmt.Println("Not any type")
+		t.Fatalf("Not any type")
 	}
 
 }

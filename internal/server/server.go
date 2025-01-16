@@ -52,28 +52,16 @@ func HandleConnections(c net.Conn) {
 	// type assertion switch statement for different processing
 	switch msg := endpointMsg.(type) {
 	case EPMessage:
-		fmt.Printf("Message is of type: %s\n", msg.Type)
-		fmt.Printf("Message: %+v \n", msg)
 		ep.HandleEPMessage(msg)
 
 		// Creating/Asserting message queue
 	case Queue:
-		fmt.Printf("Message is of type: %s\n", msg.Type)
-		fmt.Printf("Message: %+v \n", msg)
 		ep.HandleQueueAssert(msg)
 
 	default:
 		fmt.Println("Unidentified type")
 		c.Write([]byte("Unidentified type: Types should consist of Send | Assert | Receive"))
 	}
-}
-
-func AssertInterfaceType[T any](incomingMsg interface{}) (T, error) {
-	var v T
-	if message, ok := incomingMsg.(T); ok {
-		return message, nil
-	}
-	return v, fmt.Errorf("Unable to assert type of message")
 }
 
 /*
@@ -89,12 +77,26 @@ type EPHandler interface {
 	HandleEPMessage()
 }
 
-func (ep Endpoint) HandleQueueAssert(m Queue) {
+/*
+ Create an entry in a hashmap for a new Message queue
+*/
 
+func (ep Endpoint) HandleQueueAssert(m Queue) {
+	fmt.Printf("Message is of type: %s\n", m.Type)
+	fmt.Printf("Creating/Asserting Queue with Route: %+v \n", m.QueueHeader.Name)
 }
 
-func (ep Endpoint) HandleEPMessage(m EPMessage) {
+/*
+Route the EPMessage to the appropriate channel described in the current
+EPMessages' header data
+Use the Route property of the EPMessage to locate the appropriate Route within
+the Route Map
+*/
 
+func (ep Endpoint) HandleEPMessage(m EPMessage) {
+	fmt.Printf("Message is of type: %s\n", m.Type)
+	fmt.Printf("Message: %+v \n", m)
+	fmt.Printf("Send message to Route: %+v \n", m.Route)
 }
 
 func ParseMessage(b []byte) (interface{}, error) {
