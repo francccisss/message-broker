@@ -32,6 +32,7 @@ func (s Server) ServeTCP() (net.Listener, error) {
 func HandleConnections(c net.Conn) {
 
 	defer c.Close()
+	ep := Endpoint{}
 	readBuf := make([]byte, 1024)
 	_, err := c.Read(readBuf)
 
@@ -40,10 +41,7 @@ func HandleConnections(c net.Conn) {
 		return
 	}
 
-	endpointMsg, err := ParseMessage[struct {
-		Type string
-		Body string
-	}](readBuf)
+	endpointMsg, err := ParseMessage(readBuf)
 	if err != nil {
 		log.Printf("Unable to parse message")
 		log.Println(err.Error())
@@ -52,15 +50,17 @@ func HandleConnections(c net.Conn) {
 	}
 
 	// type assertion switch statement for different processing
-	switch endpointMsg.Type {
-	case "EPMEssage":
-		fmt.Printf("Message is of type: %s\n", endpointMsg.Type)
-		fmt.Printf("Message: %+v \n", endpointMsg)
+	switch msg := endpointMsg.(type) {
+	case EPMessage:
+		fmt.Printf("Message is of type: %s\n", msg.Type)
+		fmt.Printf("Message: %+v \n", msg)
+		ep.HandleEPMessage(msg)
 
 		// Creating/Asserting message queue
-	case "Assert":
-		fmt.Printf("Message is of type: %s\n", endpointMsg.Type)
-		fmt.Printf("Message: %+v \n", endpointMsg)
+	case Queue:
+		fmt.Printf("Message is of type: %s\n", msg.Type)
+		fmt.Printf("Message: %+v \n", msg)
+		ep.HandleQueueAssert(msg)
 
 	default:
 		fmt.Println("Unidentified type")
@@ -68,23 +68,37 @@ func HandleConnections(c net.Conn) {
 	}
 }
 
-type MessageHandler struct {
-}
-
-type Handler interface {
-	HandleQueueAssert()
-}
-
-func (mh MessageHandler) HandleQueueAssert() {
-
-}
-
-func (mh MessageHandler) HandleEPMessage() {
-
-}
-
-func ParseMessage[T any](b []byte) (T, error) {
+func AssertInterfaceType[T any](incomingMsg interface{}) (T, error) {
 	var v T
+	if message, ok := incomingMsg.(T); ok {
+		return message, nil
+	}
+	return v, fmt.Errorf("Unable to assert type of message")
+}
+
+/*
+ Endpoint is an abstraction of a connected application using an endpoint API
+ on the client side for connecting to the server
+*/
+
+type Endpoint struct {
+}
+
+type EPHandler interface {
+	HandleQueueAssert()
+	HandleEPMessage()
+}
+
+func (ep Endpoint) HandleQueueAssert(m Queue) {
+
+}
+
+func (ep Endpoint) HandleEPMessage(m EPMessage) {
+
+}
+
+func ParseMessage(b []byte) (interface{}, error) {
+	var v interface{}
 	err := json.Unmarshal(b, &v)
 	if err != nil {
 		return v, err
