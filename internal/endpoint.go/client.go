@@ -6,10 +6,12 @@ import (
 )
 
 /*
- Endpoint is an abstraction of a connected application using an endpoint API
- on the client side for connecting to the server
-*/
+Endpoint is an abstraction of a connected application using an endpoint API
+on the client side for connecting to the server
 
+The Interface is used to handle different message types which is defined in the
+message's Header `Type` property
+*/
 type Endpoint struct {
 }
 
