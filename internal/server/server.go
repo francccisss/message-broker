@@ -34,16 +34,20 @@ func HandleConnections(c net.Conn) {
 	ep := client.Endpoint{}
 	readBuf := make([]byte, 1024)
 	bytesRead, err := c.Read(readBuf)
+	if bytesRead == 0 {
+		log.Println("Error: Abrupt client disconnect")
+		return
+	}
 	if err != nil {
+		log.Println("Error: Unable to read message")
 		log.Println(err.Error())
-		c.Write([]byte("Unable to read message"))
 		return
 	}
 	endpointMsg, err := ParseMessage(readBuf[:bytesRead])
 	if err != nil {
-		log.Printf("Unable to parse message")
+		log.Printf("Error: Unable to parse message")
 		log.Println(err.Error())
-		c.Write([]byte("Unable to parse message"))
+		c.Write([]byte("Error: Unable to parse message"))
 		return
 	}
 
@@ -54,8 +58,8 @@ func HandleConnections(c net.Conn) {
 	case protocol.Queue:
 		ep.HandleQueueAssert(msg)
 	default:
-		fmt.Println("Unidentified type")
-		c.Write([]byte("Unidentified type: Types should consist of EPMessage | Queue "))
+		fmt.Println("Error: Unidentified type")
+		c.Write([]byte("Error: Unidentified type: Types should consist of EPMessage | Queue "))
 	}
 }
 
