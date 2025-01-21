@@ -32,7 +32,6 @@ func (s Server) ServeTCP() (net.Listener, error) {
 
 // Read Headers
 func HandleConnections(c net.Conn) {
-
 	ep := client.Endpoint{}
 	readBuf := make([]byte, 1024)
 	bytesRead, err := c.Read(readBuf)
