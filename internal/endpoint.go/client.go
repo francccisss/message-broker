@@ -3,6 +3,7 @@ package client
 import (
 	"fmt"
 	protocol "message-broker/internal"
+	router "message-broker/internal/router"
 )
 
 /*
@@ -24,9 +25,10 @@ type EPHandler interface {
  Create an entry in a hashmap for a new Message queue
 */
 
-func (ep Endpoint) HandleQueueAssert(m protocol.Queue) {
-	fmt.Printf("Message is of type: %s\n", m.Type)
-	fmt.Printf("Creating/Asserting Queue with Route: %+v \n", m.QueueHeader.Name)
+func (ep Endpoint) HandleQueueAssert(q protocol.Queue) {
+	fmt.Printf("Message is of type: %s\n", q.Type)
+	router.CreateQueue(q)
+	fmt.Printf("Creating/Asserting Queue with Route: %+v \n", q.Name)
 }
 
 /*
@@ -37,6 +39,8 @@ the Route Map
 */
 
 func (ep Endpoint) HandleEPMessage(m protocol.EPMessage) {
-	fmt.Printf("Message is of type: %s\n", m.Type)
+	fmt.Printf("Message is of type: %s\n", m.MessageType)
 	fmt.Printf("Send message to Route: %+v \n", m.Route)
+	router.RouteMessage(m)
+
 }

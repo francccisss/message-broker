@@ -23,21 +23,17 @@ Header for Sending
 
 // To describe the queue to be created
 type QueueHeader struct {
-	Name    string
-	Type    string
-	Durable bool
 }
 
 type Queue struct {
-	Type string
-	QueueHeader
-	HeaderSize int
-	Body       string
+	MessageType string
+	Name        string
+	Type        string
+	Durable     bool
 }
 
 type EPMessage struct {
-	Type       string
-	Route      string
-	HeaderSize int
-	Body       string
+	MessageType string
+	Route       string
+	Body        any
 }

@@ -2,7 +2,9 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	protocol "message-broker/internal"
 	client "message-broker/internal/endpoint.go"
@@ -34,7 +36,7 @@ func HandleConnections(c net.Conn) {
 	ep := client.Endpoint{}
 	readBuf := make([]byte, 1024)
 	bytesRead, err := c.Read(readBuf)
-	if bytesRead == 0 {
+	if errors.Is(err, io.EOF) {
 		log.Println("Error: Abrupt client disconnect")
 		return
 	}
@@ -72,7 +74,7 @@ func ParseMessage(b []byte) (interface{}, error) {
 		return nil, err
 	}
 
-	switch temp["Type"] {
+	switch temp["MessageType"] {
 	case "EPMessage":
 		var epMsg protocol.EPMessage
 		err := json.Unmarshal(b, &epMsg)
