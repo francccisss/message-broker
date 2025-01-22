@@ -1,6 +1,7 @@
 package router
 
 import (
+	"message-broker/internal/utils/queue"
 	"net"
 )
 
@@ -15,15 +16,15 @@ type Route struct {
 	Type         string
 	Name         string
 	Connections  []*net.Conn
-	MessageQueue [][]byte
+	MessageQueue queue.Queue
 	Durable      bool
 }
+
+var table = map[string]Route{}
 
 type P2P interface{}
 type PubSub interface{}
 
-var Table map[string]Route
-
 func GetRouteTable() map[string]Route {
-	return Table
+	return table
 }

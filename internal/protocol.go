@@ -21,10 +21,6 @@ Header for Sending
     ?- Specify different model
 */
 
-// To describe the queue to be created
-type QueueHeader struct {
-}
-
 type Queue struct {
 	MessageType string
 	Name        string
@@ -35,5 +31,5 @@ type Queue struct {
 type EPMessage struct {
 	MessageType string
 	Route       string
-	Body        any
+	Body        []byte
 }

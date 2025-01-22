@@ -9,6 +9,7 @@ import (
 	protocol "message-broker/internal"
 	client "message-broker/internal/endpoint.go"
 	"net"
+	"sync"
 )
 
 type Server struct {
@@ -32,6 +33,7 @@ func (s Server) ServeTCP() (net.Listener, error) {
 
 // Read Headers
 func HandleConnections(c net.Conn) {
+	var mux sync.Mutex
 	ep := client.Endpoint{}
 	readBuf := make([]byte, 1024)
 	bytesRead, err := c.Read(readBuf)
@@ -55,9 +57,13 @@ func HandleConnections(c net.Conn) {
 	// type assertion switch statement for different processing
 	switch msg := endpointMsg.(type) {
 	case protocol.EPMessage:
+		mux.Lock()
 		ep.HandleEPMessage(msg)
+		mux.Unlock()
 	case protocol.Queue:
+		mux.Lock()
 		ep.HandleQueueAssert(msg)
+		mux.Unlock()
 	default:
 		fmt.Println("Error: Unidentified type")
 		c.Write([]byte("Error: Unidentified type: Types should consist of EPMessage | Queue "))
