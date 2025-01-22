@@ -18,6 +18,7 @@ The Interface is used to handle different message types which is defined in the
 message's Header `Type` property
 */
 type Endpoint struct {
+	Mux *sync.Mutex
 }
 
 type EPHandler interface {
@@ -68,16 +69,17 @@ func (ep Endpoint) HandleEPMessage(m protocol.EPMessage) error {
 
 	// Queue up messages
 	route.MessageQueue.Enqueue(m.Body)
+	go ep.SendMessageToRoute(route)
 	return nil
 }
 
 // This is a go routine that will that should take in
 // Only send a message if there is a consumer, and if there is a message in the message queue
 // when new message is created place inside the messagequeue,
-func (ep Endpoint) SendMessageToRoute(route router.Route, m *sync.Mutex) error {
+func (ep Endpoint) SendMessageToRoute(route router.Route) error {
 
-	m.Lock()
-	defer m.Unlock()
+	ep.Mux.Lock()
+	defer ep.Mux.Unlock()
 	if len(route.Connections) < 0 {
 		for i, connection := range route.Connections {
 			_ = *connection
