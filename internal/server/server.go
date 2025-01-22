@@ -31,42 +31,48 @@ func (s Server) ServeTCP() (net.Listener, error) {
 	return ln, nil
 }
 
-// Read Headers
+/*
+Logic body for handling different message types and distributing to different performers
+  - Endpoint messages will be handled by 'HandleEPMessage()'
+  - Queue assertion will be handled by 'HandleQueueAssert()'
+*/
 func HandleConnections(c net.Conn) {
 	var mux sync.Mutex
-	ep := client.Endpoint{}
+	ep := client.Endpoint{Mux: &mux}
 	readBuf := make([]byte, 1024)
-	bytesRead, err := c.Read(readBuf)
-	if errors.Is(err, io.EOF) {
-		log.Println("Error: Abrupt client disconnect")
-		return
-	}
-	if err != nil {
-		log.Println("Error: Unable to read message")
-		log.Println(err.Error())
-		return
-	}
-	endpointMsg, err := ParseMessage(readBuf[:bytesRead])
-	if err != nil {
-		log.Printf("Error: Unable to parse message")
-		log.Println(err.Error())
-		c.Write([]byte("Error: Unable to parse message"))
-		return
-	}
+	for {
+		bytesRead, err := c.Read(readBuf)
+		if errors.Is(err, io.EOF) {
+			log.Println("Error: Abrupt client disconnect")
+			return
+		}
+		if err != nil {
+			log.Println("Error: Unable to read message")
+			log.Println(err.Error())
+			return
+		}
+		endpointMsg, err := ParseMessage(readBuf[:bytesRead])
+		if err != nil {
+			log.Printf("Error: Unable to parse message")
+			log.Println(err.Error())
+			c.Write([]byte("Error: Unable to parse message"))
+			return
+		}
 
-	// type assertion switch statement for different processing
-	switch msg := endpointMsg.(type) {
-	case protocol.EPMessage:
-		mux.Lock()
-		ep.HandleEPMessage(msg)
-		mux.Unlock()
-	case protocol.Queue:
-		mux.Lock()
-		ep.HandleQueueAssert(msg)
-		mux.Unlock()
-	default:
-		fmt.Println("Error: Unidentified type")
-		c.Write([]byte("Error: Unidentified type: Types should consist of EPMessage | Queue "))
+		// type assertion switch statement for different processing
+		switch msg := endpointMsg.(type) {
+		case protocol.EPMessage:
+			mux.Lock()
+			ep.HandleEPMessage(msg)
+			mux.Unlock()
+		case protocol.Queue:
+			mux.Lock()
+			ep.HandleQueueAssert(msg)
+			mux.Unlock()
+		default:
+			fmt.Println("Error: Unidentified type")
+			c.Write([]byte("Error: Unidentified type: Types should consist of EPMessage | Queue "))
+		}
 	}
 }
 
