@@ -3,8 +3,8 @@ package client
 import (
 	"fmt"
 	"log"
-	protocol "message-broker/internal"
 	router "message-broker/internal/router"
+	msgType "message-broker/internal/types"
 	"message-broker/internal/utils/queue"
 	"net"
 	"sync"
@@ -22,8 +22,8 @@ type Endpoint struct {
 }
 
 type EPHandler interface {
-	HandleQueueAssert(protocol.Queue)
-	HandleEPMessage(protocol.EPMessage)
+	HandleQueueAssert(msgType.Queue)
+	HandleEPMessage(msgType.EPMessage)
 	SendMessageToRoute()
 }
 
@@ -36,7 +36,7 @@ When a route is matched within the RouteTable a type of Route will be accessible
     each item in the queue messages
   - an error is thrown if no route matched with the message Route
 */
-func (ep Endpoint) HandleQueueAssert(q protocol.Queue) {
+func (ep Endpoint) HandleQueueAssert(q msgType.Queue) {
 	fmt.Printf("Creating/Asserting Queue with Route: %+v \n", q.Name)
 	fmt.Printf("Message Queue is of type: %s\n", q.Type)
 	table := router.GetRouteTable()
@@ -58,7 +58,7 @@ Handling Endpoint Messages
   - Use the Route property of the EPMessage to locate the appropriate Route
     within the Route Map
 */
-func (ep Endpoint) HandleEPMessage(m protocol.EPMessage) error {
+func (ep Endpoint) HandleEPMessage(m msgType.EPMessage) error {
 	fmt.Printf("Send message to Route: %+v \n", m.Route)
 	fmt.Printf("Message type is of type: %s\n", m.MessageType)
 	table := router.GetRouteTable()

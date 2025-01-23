@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"io"
 	"log"
-	protocol "message-broker/internal"
 	client "message-broker/internal/endpoint.go"
+	msgType "message-broker/internal/types"
 	"net"
 	"sync"
 )
@@ -51,7 +51,7 @@ func HandleConnections(c net.Conn) {
 			log.Println(err.Error())
 			return
 		}
-		endpointMsg, err := ParseMessage(readBuf[:bytesRead])
+		endpointMsg, err := MessageParser(readBuf[:bytesRead])
 		if err != nil {
 			log.Printf("Error: Unable to parse message")
 			log.Println(err.Error())
@@ -61,11 +61,11 @@ func HandleConnections(c net.Conn) {
 
 		// type assertion switch statement for different processing
 		switch msg := endpointMsg.(type) {
-		case protocol.EPMessage:
+		case msgType.EPMessage:
 			mux.Lock()
 			ep.HandleEPMessage(msg)
 			mux.Unlock()
-		case protocol.Queue:
+		case msgType.Queue:
 			mux.Lock()
 			ep.HandleQueueAssert(msg)
 			mux.Unlock()
@@ -76,10 +76,11 @@ func HandleConnections(c net.Conn) {
 	}
 }
 
-// Unmasrshalling returns a generic interface not `interface{}`
-// need to hardcode type assertion using internal property "Type"
-
-func ParseMessage(b []byte) (interface{}, error) {
+// Given an empty interface where it can store any value of and be represented as any type,
+// we need to assert that its of some known type by matching the "MessageType" of the incoming message,
+// once the "MessageType" of the message is known, we can then Unmarashal the message into the specified
+// known type that matched the "MessageType"
+func MessageParser(b []byte) (interface{}, error) {
 	var temp map[string]interface{}
 	if err := json.Unmarshal(b, &temp); err != nil {
 		return nil, err
@@ -87,14 +88,14 @@ func ParseMessage(b []byte) (interface{}, error) {
 
 	switch temp["MessageType"] {
 	case "EPMessage":
-		var epMsg protocol.EPMessage
+		var epMsg msgType.EPMessage
 		err := json.Unmarshal(b, &epMsg)
 		if err != nil {
 			return nil, err
 		}
 		return epMsg, nil
 	case "Queue":
-		var q protocol.Queue
+		var q msgType.Queue
 		err := json.Unmarshal(b, &q)
 		if err != nil {
 			return nil, err
