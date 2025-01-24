@@ -13,22 +13,34 @@ import (
 )
 
 type Server struct {
-	addr string
-	port string
+	addr        string
+	port        string
+	ln          net.Listener
+	serverState chan error
 }
 
-func NewServer(addr string, port string) Server {
-	return Server{addr: addr, port: port}
+func NewServer(addr string, port string, state chan error) Server {
+	return Server{addr: addr, port: port, serverState: state}
 }
 
-func (s Server) ServeTCP() (net.Listener, error) {
+func (s *Server) ServeTCP() {
 	ln, err := net.Listen("tcp", ":"+s.port)
 	if err != nil {
 		log.Println("Unable to start TCP server.")
-		return nil, err
+		s.serverState <- err
 	}
+	s.ln = ln
 	log.Printf("Server Success Listen to %s:%s", "localhost", s.port)
-	return ln, nil
+}
+func (s *Server) ListenIncomingSegments() {
+	for {
+		log.Println("Accepting connections")
+		_, err := s.ln.Accept()
+		if err != nil {
+			s.serverState <- err
+			log.Println("Unable to accept new TCP connections")
+		}
+	}
 }
 
 /*

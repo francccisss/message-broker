@@ -6,20 +6,18 @@ import (
 )
 
 func main() {
-	s := server.NewServer("", "5671")
-
-	ln, err := s.ServeTCP()
-	if err != nil {
+	serverState := make(chan error)
+	s := server.NewServer("", "5671", serverState)
+	s.ServeTCP()
+	s.ListenIncomingSegments()
+	state := <-serverState
+	// I dont know what im doing but I made it so
+	// that when the server returns an error it
+	// would instead pass it to the server state
+	// to handle it in a single place using channels
+	if state != nil {
 		log.Println("Exiting application")
-		log.Panicf(err.Error())
+		log.Panicln(state.Error())
 	}
-
-	for {
-		log.Println("Accepting connections")
-		_, err := ln.Accept()
-		if err != nil {
-			log.Printf("Unable to accept new TCP connections")
-			log.Panicf(err.Error())
-		}
-	}
+	log.Println("Server shutdown")
 }
