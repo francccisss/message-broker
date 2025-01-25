@@ -53,6 +53,9 @@ Logic body for handling different message types and distributing to different pe
 func HandleConnections(c net.Conn) {
 	var mux sync.Mutex
 	ep := client.Endpoint{Mux: &mux, Conn: c}
+	// TODO FIX
+	// FIX THIS IT ONLY READS 1024 BUT WHEN MESSAGES ARE > 1024 IT THROWS
+	// IT THROWS AN ERROR BECAUSE IT CANT FULLY PARSE THE JSON DATA
 	readBuf := make([]byte, 1024)
 	defer c.Close()
 	for {
@@ -67,10 +70,26 @@ func HandleConnections(c net.Conn) {
 			return
 		}
 		endpointMsg, err := MessageParser(readBuf[:bytesRead])
+
+		// ERROR Handling
 		if err != nil {
 			log.Printf("ERROR: Unable to parse message")
 			log.Println(err.Error())
-			c.Write([]byte("ERROR: Unable to parse message"))
+			b, err := json.Marshal(msgType.ErrorMessage{
+				Body:        []byte("ERROR: Unable to parse message"),
+				MessageType: "ErrorMessage",
+			})
+			if err != nil {
+				log.Println("ERROR: Unable to Marshal error message")
+				log.Println(err.Error())
+				return
+			}
+			_, err = c.Write(b)
+			if err != nil {
+				log.Println("ERROR: Unable to send error message to client")
+				log.Println(err.Error())
+				return
+			}
 			return
 		}
 

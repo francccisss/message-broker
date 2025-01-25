@@ -38,3 +38,7 @@ type Consumer struct {
 	MessageType string
 	Route       string
 }
+type ErrorMessage struct {
+	MessageType string
+	Body        []byte
+}
