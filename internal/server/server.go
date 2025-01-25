@@ -26,20 +26,22 @@ func NewServer(addr string, port string, state chan error) Server {
 func (s *Server) ServeTCP() {
 	ln, err := net.Listen("tcp", ":"+s.port)
 	if err != nil {
-		log.Println("Unable to start TCP server.")
+		log.Println("ERROR: Unable to start TCP server.")
 		s.serverState <- err
 	}
 	s.ln = ln
-	log.Printf("Server Success Listen to %s:%s", "localhost", s.port)
+	log.Printf("NOTIF: Server Success Listen to %s:%s", "localhost", s.port)
 }
 func (s *Server) ListenIncomingSegments() {
+	log.Println("NOTIF: Accepting connections")
 	for {
-		log.Println("Accepting connections")
-		_, err := s.ln.Accept()
+		c, err := s.ln.Accept()
+		log.Println("NOTIF: Client connected")
 		if err != nil {
 			s.serverState <- err
-			log.Println("Unable to accept new TCP connections")
+			log.Println("ERROR: Unable to accept new TCP connections")
 		}
+		go HandleConnections(c)
 	}
 }
 
@@ -55,19 +57,19 @@ func HandleConnections(c net.Conn) {
 	for {
 		bytesRead, err := c.Read(readBuf)
 		if errors.Is(err, io.EOF) {
-			log.Println("Error: Abrupt client disconnect")
+			log.Println("ERROR: Abrupt client disconnect")
 			return
 		}
 		if err != nil {
-			log.Println("Error: Unable to read message")
+			log.Println("ERROR: Unable to read message")
 			log.Println(err.Error())
 			return
 		}
 		endpointMsg, err := MessageParser(readBuf[:bytesRead])
 		if err != nil {
-			log.Printf("Error: Unable to parse message")
+			log.Printf("ERROR: Unable to parse message")
 			log.Println(err.Error())
-			c.Write([]byte("Error: Unable to parse message"))
+			c.Write([]byte("ERROR: Unable to parse message"))
 			return
 		}
 
@@ -82,8 +84,8 @@ func HandleConnections(c net.Conn) {
 			ep.HandleQueueAssert(msg)
 			mux.Unlock()
 		default:
-			fmt.Println("Error: Unidentified type")
-			c.Write([]byte("Error: Unidentified type: Types should consist of EPMessage | Queue "))
+			fmt.Println("ERROR: Unidentified type")
+			c.Write([]byte("ERROR: Unidentified type: Types should consist of EPMessage | Queue "))
 		}
 	}
 }
@@ -114,6 +116,6 @@ func MessageParser(b []byte) (interface{}, error) {
 		}
 		return q, nil
 	default:
-		return temp, fmt.Errorf("Not of any known message type")
+		return temp, fmt.Errorf("ERROR: Not of any known message type")
 	}
 }

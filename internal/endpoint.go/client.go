@@ -37,8 +37,8 @@ When a route is matched within the RouteTable a type of Route will be accessible
   - an error is thrown if no route matched with the message Route
 */
 func (ep Endpoint) HandleQueueAssert(q msgType.Queue) {
-	fmt.Printf("Creating/Asserting Queue with Route: %+v \n", q.Name)
-	fmt.Printf("Message Queue is of type: %s\n", q.Type)
+	fmt.Printf("NOTIF: Creating/Asserting Queue with Route: %+v \n", q.Name)
+	fmt.Printf("NOTIF: Message Queue is of type: %s\n", q.Type)
 	table := router.GetRouteTable()
 	_, exists := table[q.Name]
 	if !exists {
@@ -59,8 +59,8 @@ Handling Endpoint Messages
     within the Route Map
 */
 func (ep Endpoint) HandleEPMessage(m msgType.EPMessage) error {
-	fmt.Printf("Send message to Route: %+v \n", m.Route)
-	fmt.Printf("Message type is of type: %s\n", m.MessageType)
+	fmt.Printf("NOTIF: Send message to Route: %+v \n", m.Route)
+	fmt.Printf("NOTIF: Message type is of type: %s\n", m.MessageType)
 	table := router.GetRouteTable()
 	route, exists := table[m.Route]
 	if !exists {

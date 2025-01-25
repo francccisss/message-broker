@@ -15,9 +15,10 @@ func main() {
 	// that when the server returns an error it
 	// would instead pass it to the server state
 	// to handle it in a single place using channels
+	log.Println("NOTIF: Exiting application")
 	if state != nil {
-		log.Println("Exiting application")
 		log.Panicln(state.Error())
 	}
-	log.Println("Server shutdown")
+	log.Println("NOTIF: Server shutdown")
+
 }
