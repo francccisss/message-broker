@@ -54,6 +54,7 @@ func HandleConnections(c net.Conn) {
 	var mux sync.Mutex
 	ep := client.Endpoint{Mux: &mux}
 	readBuf := make([]byte, 1024)
+	defer c.Close()
 	for {
 		bytesRead, err := c.Read(readBuf)
 		if errors.Is(err, io.EOF) {

@@ -25,6 +25,6 @@ var table = map[string]Route{}
 type P2P interface{}
 type PubSub interface{}
 
-func GetRouteTable() map[string]Route {
-	return table
+func GetRouteTable() *map[string]Route {
+	return &table
 }
