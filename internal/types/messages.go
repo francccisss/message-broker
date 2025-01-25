@@ -33,3 +33,8 @@ type EPMessage struct {
 	Route       string
 	Body        []byte
 }
+
+type Consumer struct {
+	MessageType string
+	Route       string
+}

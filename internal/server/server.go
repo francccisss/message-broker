@@ -52,7 +52,7 @@ Logic body for handling different message types and distributing to different pe
 */
 func HandleConnections(c net.Conn) {
 	var mux sync.Mutex
-	ep := client.Endpoint{Mux: &mux}
+	ep := client.Endpoint{Mux: &mux, Conn: c}
 	readBuf := make([]byte, 1024)
 	defer c.Close()
 	for {
@@ -79,6 +79,11 @@ func HandleConnections(c net.Conn) {
 		case msgType.EPMessage:
 			mux.Lock()
 			ep.HandleEPMessage(msg)
+			mux.Unlock()
+		case msgType.Consumer:
+			mux.Lock()
+			log.Printf("%+v", msg)
+			ep.HandleConsumers(msg)
 			mux.Unlock()
 		case msgType.Queue:
 			mux.Lock()
@@ -109,6 +114,13 @@ func MessageParser(b []byte) (interface{}, error) {
 			return nil, err
 		}
 		return epMsg, nil
+	case "Consumer":
+		var cons msgType.Consumer
+		err := json.Unmarshal(b, &cons)
+		if err != nil {
+			return nil, err
+		}
+		return cons, nil
 	case "Queue":
 		var q msgType.Queue
 		err := json.Unmarshal(b, &q)

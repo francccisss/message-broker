@@ -18,13 +18,27 @@ The Interface is used to handle different message types which is defined in the
 message's Header `Type` property
 */
 type Endpoint struct {
-	Mux *sync.Mutex
+	Mux  *sync.Mutex
+	Conn net.Conn
 }
 
 type EPHandler interface {
 	HandleQueueAssert(msgType.Queue)
 	HandleEPMessage(msgType.EPMessage)
+	HandleConsumers(msgType.Consumer)
 	SendMessageToRoute()
+}
+
+func (ep Endpoint) HandleConsumers(msg msgType.Consumer) {
+	table := router.GetRouteTable()
+	r, exists := table[msg.Route]
+	if !exists {
+		log.Printf("ERROR: Message queue does not exist with specified route: %s\n", msg.Route)
+		return
+	}
+	r.Connections = append(r.Connections, ep.Conn)
+
+	log.Printf("NOTIF: Register consumer in route: %s\n", msg.Route)
 }
 
 /*
