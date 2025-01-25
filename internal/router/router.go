@@ -15,16 +15,16 @@ handling the multiplexing/demultiplexing using a `message dispatcher`
 type Route struct {
 	Type         string
 	Name         string
-	Connections  []*net.Conn
+	Connections  []net.Conn
 	MessageQueue queue.Queue
 	Durable      bool
 }
 
-var table = map[string]Route{}
+var table = map[string]*Route{}
 
 type P2P interface{}
 type PubSub interface{}
 
-func GetRouteTable() *map[string]Route {
-	return &table
+func GetRouteTable() map[string]*Route {
+	return table
 }

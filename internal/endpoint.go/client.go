@@ -39,15 +39,16 @@ When a route is matched within the RouteTable a type of Route will be accessible
 func (ep Endpoint) HandleQueueAssert(q msgType.Queue) {
 	fmt.Printf("NOTIF: Creating/Asserting Queue with Route: %+v \n", q.Name)
 	fmt.Printf("NOTIF: Message Queue is of type: %s\n", q.Type)
-	table := *router.GetRouteTable()
+	table := router.GetRouteTable()
 	_, exists := table[q.Name]
 	if !exists {
-		table[q.Name] = router.Route{
+		table[q.Name] = &router.Route{
 			Type:        q.Type,
 			Name:        q.Name,
 			Durable:     q.Durable,
-			Connections: []*net.Conn{},
+			Connections: []net.Conn{},
 		}
+		fmt.Printf("Route Name: %s\nRoute: %+v", q.Name, q)
 		fmt.Printf("NOTIF: MESSAGE QUEUE CREATED: %s\n", q.Name)
 	}
 }
@@ -62,7 +63,7 @@ Handling Endpoint Messages
 func (ep Endpoint) HandleEPMessage(m msgType.EPMessage) error {
 	fmt.Printf("NOTIF: Send message to Route: %+v \n", m.Route)
 	fmt.Printf("NOTIF: Message type is of type: %s\n", m.MessageType)
-	table := *router.GetRouteTable()
+	table := router.GetRouteTable()
 	route, exists := table[m.Route]
 	if !exists {
 		return fmt.Errorf("ERROR: A message for route: %s does not exist, either specify an existing route or create one using `AssertQueue`", m.Route)
@@ -77,11 +78,10 @@ func (ep Endpoint) HandleEPMessage(m msgType.EPMessage) error {
 // This is a go routine that will that should take in
 // Only send a message if there is a consumer, and if there is a message in the message queue
 // when new message is created place inside the messagequeue,
-func (ep Endpoint) SendMessageToRoute(route router.Route) {
+func (ep Endpoint) SendMessageToRoute(route *router.Route) {
 	log.Printf("Number of connections in the current route: route: %s, connections: %d", route.Name, len(route.Connections))
 	if len(route.Connections) < 0 {
-		for i, connection := range route.Connections {
-			_ = *connection
+		for i := range route.Connections {
 			// TESTING
 			// Sending messages concurrently to different connections
 			go func(index int, messages queue.Queue) {
