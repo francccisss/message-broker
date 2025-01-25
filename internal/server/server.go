@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
-	client "message-broker/internal/endpoint.go"
+	client "message-broker/internal/endpoint"
 	msgType "message-broker/internal/types"
 	"net"
 	"sync"
