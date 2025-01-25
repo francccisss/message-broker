@@ -82,7 +82,6 @@ func HandleConnections(c net.Conn) {
 			mux.Unlock()
 		case msgType.Consumer:
 			mux.Lock()
-			log.Printf("%+v", msg)
 			ep.HandleConsumers(msg)
 			mux.Unlock()
 		case msgType.Queue:

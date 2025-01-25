@@ -38,6 +38,7 @@ func (ep Endpoint) HandleConsumers(msg msgType.Consumer) {
 	}
 	r.Connections = append(r.Connections, ep.Conn)
 
+	ep.SendMessageToRoute(r)
 	log.Printf("NOTIF: Register consumer in route: %s\n", msg.Route)
 }
 
@@ -51,8 +52,6 @@ When a route is matched within the RouteTable a type of Route will be accessible
   - an error is thrown if no route matched with the message Route
 */
 func (ep Endpoint) HandleQueueAssert(q msgType.Queue) {
-	fmt.Printf("NOTIF: Creating/Asserting Queue with Route: %+v \n", q.Name)
-	fmt.Printf("NOTIF: Message Queue is of type: %s\n", q.Type)
 	table := router.GetRouteTable()
 	_, exists := table[q.Name]
 	if !exists {
@@ -62,7 +61,6 @@ func (ep Endpoint) HandleQueueAssert(q msgType.Queue) {
 			Durable:     q.Durable,
 			Connections: []net.Conn{},
 		}
-		fmt.Printf("Route Name: %s\nRoute: %+v", q.Name, q)
 		fmt.Printf("NOTIF: MESSAGE QUEUE CREATED: %s\n", q.Name)
 	}
 }
@@ -75,8 +73,6 @@ Handling Endpoint Messages
     within the Route Map
 */
 func (ep Endpoint) HandleEPMessage(m msgType.EPMessage) error {
-	fmt.Printf("NOTIF: Send message to Route: %+v \n", m.Route)
-	fmt.Printf("NOTIF: Message type is of type: %s\n", m.MessageType)
 	table := router.GetRouteTable()
 	route, exists := table[m.Route]
 	if !exists {
@@ -93,23 +89,21 @@ func (ep Endpoint) HandleEPMessage(m msgType.EPMessage) error {
 // Only send a message if there is a consumer, and if there is a message in the message queue
 // when new message is created place inside the messagequeue,
 func (ep Endpoint) SendMessageToRoute(route *router.Route) {
-	log.Printf("Number of connections in the current route: route: %s, connections: %d", route.Name, len(route.Connections))
-	if len(route.Connections) < 0 {
-		for i := range route.Connections {
-			// TESTING
-			// Sending messages concurrently to different connections
-			go func(index int, messages queue.Queue) {
-				for range len(messages.GetItems()) {
-					log.Println(route.MessageQueue.Dequeue().([]byte))
-				}
-			}(i, route.MessageQueue)
-			// Dequeuing Byte array
-			// _, err := c.Write(route.MessageQueue.Dequeue().([]byte))
-			// if err != nil {
-			// 	log.Println("ERROR: Unable to write to consumer")
-			// 	return err
-			// }
+	log.Printf("Number of connections in the current route: \nRoute: %s, \nConnections: %d, \nPending Messages in Queue: %d", route.Name, len(route.Connections), len(route.MessageQueue.GetItems()))
+	for i := range route.Connections {
+		// TESTING
+		// Sending messages concurrently to different connections
+		go func(index int, messages queue.Queue) {
+			for range len(messages.GetItems()) {
+				log.Printf("Message for route %s: %s", route.Name, string(route.MessageQueue.Dequeue().([]byte)))
+			}
+		}(i, route.MessageQueue)
+		// Dequeuing Byte array
+		// _, err := c.Write(route.MessageQueue.Dequeue().([]byte))
+		// if err != nil {
+		// 	log.Println("ERROR: Unable to write to consumer")
+		// 	return err
+		// }
 
-		}
 	}
 }
