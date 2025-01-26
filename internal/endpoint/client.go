@@ -79,6 +79,7 @@ func (ep Endpoint) MessageHandler(msgBuf bytes.Buffer) {
 }
 
 func (ep Endpoint) handleConsumers(msg msgType.Consumer) {
+	log.Println("NOTIF: Consumer Message received")
 	table := router.GetRouteTable()
 	r, exists := table[msg.Route]
 	if !exists {
@@ -101,6 +102,7 @@ When a route is matched within the RouteTable a type of Route will be accessible
   - an error is thrown if no route matched with the message Route
 */
 func (ep Endpoint) handleQueueAssert(q msgType.Queue) {
+	log.Println("NOTIF: Queue Message received")
 	table := router.GetRouteTable()
 	_, exists := table[q.Name]
 	if !exists {
@@ -122,6 +124,7 @@ Handling Endpoint Messages
     within the Route Map
 */
 func (ep Endpoint) handleEPMessage(m msgType.EPMessage) error {
+	log.Println("NOTIF: EP Message received")
 	table := router.GetRouteTable()
 	route, exists := table[m.Route]
 	if !exists {

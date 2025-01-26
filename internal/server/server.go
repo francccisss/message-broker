@@ -59,7 +59,7 @@ func HandleConnections(c net.Conn) {
 	var msgBuf bytes.Buffer
 	for {
 		var _ bytes.Buffer
-		headerBuf := make([]byte, 1024)
+		headerBuf := make([]byte, 4)
 		_, err := c.Read(headerBuf)
 		if err != nil {
 			log.Println("ERROR: Unable to decode header prefix length")
@@ -69,7 +69,6 @@ func HandleConnections(c net.Conn) {
 		expectedMsgLength := int(binary.LittleEndian.Uint32(headerBuf[:4]))
 
 		log.Printf("Prefix Length Receieved: %d\n", expectedMsgLength)
-		log.Printf("Total in slice: %+v\n", headerBuf[:expectedMsgLength])
 		for {
 			bodyBuf := make([]byte, 1024)
 			_, err := c.Read(bodyBuf)
@@ -85,6 +84,7 @@ func HandleConnections(c net.Conn) {
 				log.Printf("ERROR: Unable to append bytes to the message buffer ")
 				break
 			}
+			log.Printf("Total in slice: %+v\n", msgBuf.Bytes()[:expectedMsgLength])
 			if msgBuf.Len() == expectedMsgLength {
 				log.Printf("NOTIF: Receieved all values: %d", msgBuf.Len())
 				go ep.MessageHandler(msgBuf)
