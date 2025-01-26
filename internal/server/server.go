@@ -1,13 +1,13 @@
 package server
 
 import (
-	"encoding/json"
-	"errors"
-	"fmt"
-	"io"
+	"bytes"
+	"encoding/binary"
+	// "errors"
+	// "io"
 	"log"
+	"math"
 	client "message-broker/internal/endpoint"
-	msgType "message-broker/internal/types"
 	"net"
 	"sync"
 )
@@ -56,97 +56,63 @@ func HandleConnections(c net.Conn) {
 	// TODO FIX
 	// FIX THIS IT ONLY READS 1024 BUT WHEN MESSAGES ARE > 1024 IT THROWS
 	// IT THROWS AN ERROR BECAUSE IT CANT FULLY PARSE THE JSON DATA
-	readBuf := make([]byte, 1024)
+
+	// Using prefix length data stream
+	// Header has 4 bytes which is the number of bytes
+	// to be expected by the receiver to receive and parse once
+	// it has all of the required bytes defined by the header
+
+	// Buffer is only read 1024 bytes,
+	//   - Header 4 -\
+	//                > Total size 104 bytes to be read
+	//   - Body 100 -/
+
+	// its easy as extracting msgBuf := readBuf[4:msgLength]
+	// this excludes reading the prefix length header
+	// but what if body.length >= readBuf?
+	// we can check is readBuf >= body.length?
+	//   - yes? read remaining bytes
+	//   - no? listen to the next arrviving bytes
+
 	defer c.Close()
+	var msgBuf bytes.Buffer
+	prefBuf := make([]byte, 4)
+	var msglength int
+
+	headerPrefixLength := 4
+
 	for {
-		bytesRead, err := c.Read(readBuf)
-		if errors.Is(err, io.EOF) {
-			log.Println("ERROR: Abrupt client disconnect")
-			return
-		}
+		readBuf := make([]byte, 1024)
+		_, err := c.Read(readBuf)
 		if err != nil {
-			log.Println("ERROR: Unable to read message")
-			log.Println(err.Error())
-			return
+			log.Println("ERROR: Unable to decode header prefix length")
 		}
-		endpointMsg, err := MessageParser(readBuf[:bytesRead])
+		msglength, _ = binary.Decode(prefBuf, binary.LittleEndian, readBuf[:headerPrefixLength])
+		remainingBytes := int(math.Min(float64(msglength-msgBuf.Len()-headerPrefixLength), float64(1024)))
 
-		// ERROR Handling
-		if err != nil {
-			log.Printf("ERROR: Unable to parse message")
-			log.Println(err.Error())
-			b, err := json.Marshal(msgType.ErrorMessage{
-				Body:        []byte("ERROR: Unable to parse message"),
-				MessageType: "ErrorMessage",
-			})
-			if err != nil {
-				log.Println("ERROR: Unable to Marshal error message")
-				log.Println(err.Error())
-				return
-			}
-			_, err = c.Write(b)
-			if err != nil {
-				log.Println("ERROR: Unable to send error message to client")
-				log.Println(err.Error())
-				return
-			}
-			return
+		_, _ = msgBuf.Write(readBuf[:remainingBytes])
+		if remainingBytes <= msglength {
+			continue
+		}
+		if remainingBytes >= msglength || msgBuf.Len()-headerPrefixLength == msglength {
+			ep.MessageHandler(msgBuf)
 		}
 
-		// type assertion switch statement for different processing
-		switch msg := endpointMsg.(type) {
-		case msgType.EPMessage:
-			mux.Lock()
-			ep.HandleEPMessage(msg)
-			mux.Unlock()
-		case msgType.Consumer:
-			mux.Lock()
-			ep.HandleConsumers(msg)
-			mux.Unlock()
-		case msgType.Queue:
-			mux.Lock()
-			ep.HandleQueueAssert(msg)
-			mux.Unlock()
-		default:
-			fmt.Println("ERROR: Unidentified type")
-			c.Write([]byte("ERROR: Unidentified type: Types should consist of EPMessage | Queue "))
-		}
-	}
-}
+		// if errors.Is(err, io.EOF) {
+		// 	log.Println("NOTIF: End of file stream")
+		// 	return
+		// }
+		// if err != nil {
+		// 	log.Println("ERROR: Unable to read message")
+		// 	log.Println(err.Error())
+		// 	return
+		// }
+		// if err != nil {
+		// 	log.Println("ERROR: Unable to append message stream")
+		// 	log.Println(err.Error())
+		// 	return
+		// }
+		// TODO gind a way to determine the lenfrg of the incoming message from client
 
-// Given an empty interface where it can store any value of and be represented as any type,
-// we need to assert that its of some known type by matching the "MessageType" of the incoming message,
-// once the "MessageType" of the message is known, we can then Unmarashal the message into the specified
-// known type that matched the "MessageType"
-func MessageParser(b []byte) (interface{}, error) {
-	var temp map[string]interface{}
-	if err := json.Unmarshal(b, &temp); err != nil {
-		return nil, err
-	}
-
-	switch temp["MessageType"] {
-	case "EPMessage":
-		var epMsg msgType.EPMessage
-		err := json.Unmarshal(b, &epMsg)
-		if err != nil {
-			return nil, err
-		}
-		return epMsg, nil
-	case "Consumer":
-		var cons msgType.Consumer
-		err := json.Unmarshal(b, &cons)
-		if err != nil {
-			return nil, err
-		}
-		return cons, nil
-	case "Queue":
-		var q msgType.Queue
-		err := json.Unmarshal(b, &q)
-		if err != nil {
-			return nil, err
-		}
-		return q, nil
-	default:
-		return temp, fmt.Errorf("ERROR: Not of any known message type")
 	}
 }
