@@ -3,8 +3,6 @@ package server
 import (
 	"bytes"
 	"encoding/binary"
-	// "errors"
-	// "io"
 	"log"
 	"math"
 	client "message-broker/internal/endpoint"
@@ -53,66 +51,45 @@ Logic body for handling different message types and distributing to different pe
 func HandleConnections(c net.Conn) {
 	var mux sync.Mutex
 	ep := client.Endpoint{Mux: &mux, Conn: c}
-	// TODO FIX
-	// FIX THIS IT ONLY READS 1024 BUT WHEN MESSAGES ARE > 1024 IT THROWS
-	// IT THROWS AN ERROR BECAUSE IT CANT FULLY PARSE THE JSON DATA
-
-	// Using prefix length data stream
-	// Header has 4 bytes which is the number of bytes
-	// to be expected by the receiver to receive and parse once
-	// it has all of the required bytes defined by the header
-
-	// Buffer is only read 1024 bytes,
-	//   - Header 4 -\
-	//                > Total size 104 bytes to be read
-	//   - Body 100 -/
-
-	// its easy as extracting msgBuf := readBuf[4:msgLength]
-	// this excludes reading the prefix length header
-	// but what if body.length >= readBuf?
-	// we can check is readBuf >= body.length?
-	//   - yes? read remaining bytes
-	//   - no? listen to the next arrviving bytes
-
 	defer c.Close()
+
+	// fixed sized header length to extract from message stream
+	// Outer loop will always take 4 iterations
+
 	var msgBuf bytes.Buffer
-	prefBuf := make([]byte, 4)
-	var msglength int
-
-	headerPrefixLength := 4
-
 	for {
-		readBuf := make([]byte, 1024)
-		_, err := c.Read(readBuf)
+		var _ bytes.Buffer
+		headerBuf := make([]byte, 1024)
+		_, err := c.Read(headerBuf)
 		if err != nil {
 			log.Println("ERROR: Unable to decode header prefix length")
+			return
 		}
-		msglength, _ = binary.Decode(prefBuf, binary.LittleEndian, readBuf[:headerPrefixLength])
-		remainingBytes := int(math.Min(float64(msglength-msgBuf.Len()-headerPrefixLength), float64(1024)))
+		// encode to little endian
+		expectedMsgLength := int(binary.LittleEndian.Uint32(headerBuf[:4]))
 
-		_, _ = msgBuf.Write(readBuf[:remainingBytes])
-		if remainingBytes <= msglength {
-			continue
+		log.Printf("Prefix Length Receieved: %d\n", expectedMsgLength)
+		log.Printf("Total in slice: %+v\n", headerBuf[:expectedMsgLength])
+		for {
+			bodyBuf := make([]byte, 1024)
+			_, err := c.Read(bodyBuf)
+			if err != nil {
+				log.Printf("ERROR: Unable to read the incoming message body ")
+				break
+			}
+			remainingBytes := int(math.Min(float64(expectedMsgLength-msgBuf.Len()), float64(1024)))
+			// Writes the from the minimum value of remainingBytes into the buffer up to
+			// 1024 that is to be read into the bodyBuf
+			_, err = msgBuf.Write(bodyBuf[:remainingBytes])
+			if err != nil {
+				log.Printf("ERROR: Unable to append bytes to the message buffer ")
+				break
+			}
+			if msgBuf.Len() == expectedMsgLength {
+				log.Printf("NOTIF: Receieved all values: %d", msgBuf.Len())
+				go ep.MessageHandler(msgBuf)
+				break
+			}
 		}
-		if remainingBytes >= msglength || msgBuf.Len()-headerPrefixLength == msglength {
-			ep.MessageHandler(msgBuf)
-		}
-
-		// if errors.Is(err, io.EOF) {
-		// 	log.Println("NOTIF: End of file stream")
-		// 	return
-		// }
-		// if err != nil {
-		// 	log.Println("ERROR: Unable to read message")
-		// 	log.Println(err.Error())
-		// 	return
-		// }
-		// if err != nil {
-		// 	log.Println("ERROR: Unable to append message stream")
-		// 	log.Println(err.Error())
-		// 	return
-		// }
-		// TODO gind a way to determine the lenfrg of the incoming message from client
-
 	}
 }
