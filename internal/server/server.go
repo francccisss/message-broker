@@ -10,6 +10,8 @@ import (
 	"sync"
 )
 
+const READ_SIZE = 100
+
 type Server struct {
 	addr        string
 	port        string
@@ -57,8 +59,8 @@ func HandleConnections(c net.Conn) {
 	// Outer loop will always take 4 iterations
 
 	var msgBuf bytes.Buffer
+	bodyBuf := make([]byte, READ_SIZE)
 	for {
-		var _ bytes.Buffer
 		headerBuf := make([]byte, 4)
 		_, err := c.Read(headerBuf)
 		if err != nil {
@@ -70,13 +72,12 @@ func HandleConnections(c net.Conn) {
 
 		log.Printf("Prefix Length Receieved: %d\n", expectedMsgLength)
 		for {
-			bodyBuf := make([]byte, 1024)
 			_, err := c.Read(bodyBuf)
 			if err != nil {
 				log.Printf("ERROR: Unable to read the incoming message body ")
 				break
 			}
-			remainingBytes := int(math.Min(float64(expectedMsgLength-msgBuf.Len()), float64(1024)))
+			remainingBytes := int(math.Min(float64(expectedMsgLength-msgBuf.Len()), float64(READ_SIZE)))
 			// Writes the from the minimum value of remainingBytes into the buffer up to
 			// 1024 that is to be read into the bodyBuf
 			_, err = msgBuf.Write(bodyBuf[:remainingBytes])
@@ -84,9 +85,16 @@ func HandleConnections(c net.Conn) {
 				log.Printf("ERROR: Unable to append bytes to the message buffer ")
 				break
 			}
-			log.Printf("Total in slice: %+v\n", msgBuf.Bytes()[:expectedMsgLength])
+			log.Printf("Current Total in msgBuf: %+v\n", msgBuf.Len())
 			if msgBuf.Len() == expectedMsgLength {
-				log.Printf("NOTIF: Receieved all values: %d", msgBuf.Len())
+				log.Printf("NOTIF: Receieved all values: %d\n", msgBuf.Bytes())
+
+				log.Printf("BODYBUF BEFORE:\n %+v\n", bodyBuf)
+				//TODO Move the remaining bytes for the next request
+				// after receiving all of the bytes for current request
+				bodyBuf = bodyBuf[remainingBytes:]
+				log.Printf("BODYBUF AFTER:\n %+v\n", bodyBuf)
+
 				go ep.MessageHandler(msgBuf)
 				break
 			}

@@ -2,7 +2,6 @@ package client
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"log"
 	router "message-broker/internal/router"
@@ -38,21 +37,6 @@ func (ep Endpoint) MessageHandler(msgBuf bytes.Buffer) {
 	if err != nil {
 		log.Printf("ERROR: Unable to parse message")
 		log.Println(err.Error())
-		b, err := json.Marshal(msgType.ErrorMessage{
-			Body:        []byte("ERROR: Unable to parse message"),
-			MessageType: "ErrorMessage",
-		})
-		if err != nil {
-			log.Println("ERROR: Unable to Marshal error message")
-			log.Println(err.Error())
-			return
-		}
-		_, err = ep.Conn.Write(b)
-		if err != nil {
-			log.Println("ERROR: Unable to send error message to client")
-			log.Println(err.Error())
-			return
-		}
 		return
 	}
 
@@ -72,7 +56,7 @@ func (ep Endpoint) MessageHandler(msgBuf bytes.Buffer) {
 		ep.Mux.Unlock()
 	default:
 		fmt.Println("ERROR: Unidentified type")
-		ep.Conn.Write([]byte("ERROR: Unidentified type: Types should consist of EPMessage | Queue "))
+		// ep.Conn.Write([]byte("ERROR: Unidentified type: Types should consist of EPMessage | Queue "))
 	}
 	return
 
