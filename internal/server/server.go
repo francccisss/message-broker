@@ -11,6 +11,7 @@ import (
 )
 
 const READ_SIZE = 100
+const HEADER_SIZE = 4
 
 type Server struct {
 	addr        string
@@ -58,19 +59,18 @@ func HandleConnections(c net.Conn) {
 	// fixed sized header length to extract from message stream
 	// Outer loop will always take 4 iterations
 
-	var msgBuf bytes.Buffer
 	bodyBuf := make([]byte, READ_SIZE)
+	headerBuf := make([]byte, HEADER_SIZE)
 	for {
-		headerBuf := make([]byte, 4)
+		var msgBuf bytes.Buffer
 		_, err := c.Read(headerBuf)
 		if err != nil {
 			log.Println("ERROR: Unable to decode header prefix length")
 			return
 		}
-		// encode to little endian
-		expectedMsgLength := int(binary.LittleEndian.Uint32(headerBuf[:4]))
-
+		expectedMsgLength := int(binary.LittleEndian.Uint32(headerBuf[:HEADER_SIZE]))
 		log.Printf("Prefix Length Receieved: %d\n", expectedMsgLength)
+
 		for {
 			_, err := c.Read(bodyBuf)
 			if err != nil {
@@ -85,17 +85,39 @@ func HandleConnections(c net.Conn) {
 				log.Printf("ERROR: Unable to append bytes to the message buffer ")
 				break
 			}
+
 			log.Printf("Current Total in msgBuf: %+v\n", msgBuf.Len())
 			if msgBuf.Len() == expectedMsgLength {
 				log.Printf("NOTIF: Receieved all values: %d\n", msgBuf.Bytes())
 
+				go ep.MessageHandler(msgBuf)
+
 				log.Printf("BODYBUF BEFORE:\n %+v\n", bodyBuf)
-				//TODO Move the remaining bytes for the next request
-				// after receiving all of the bytes for current request
-				bodyBuf = bodyBuf[remainingBytes:]
+
+				// Currently head buff is occupied
+				// so replace it with approrriate size with the excess from bodyBuf
+				// to the headerBuff and leave the rest within the bodyBuf
+
+				// Since TCP is a stream oriented protocol, each new requeust travels in a single
+				// connection so to handle excess bytes within the stream, we need to extract
+				// and place these excess bytes in to the header and the body buffers
+				if len(bodyBuf[remainingBytes:]) < HEADER_SIZE {
+					log.Println("LESS")
+					copy(headerBuf, bodyBuf)
+					bodyBuf = bodyBuf[:0]
+				} else {
+					log.Println("GREATER")
+					log.Printf("EXTRACTED HEADER LENGTH :%d\n", len(bodyBuf[remainingBytes:remainingBytes+HEADER_SIZE]))
+
+					copy(headerBuf, bodyBuf[remainingBytes:remainingBytes+HEADER_SIZE])
+					// O^N
+					copy(bodyBuf, bodyBuf[remainingBytes+HEADER_SIZE:])
+				}
+				log.Printf("HEADER BUFF AFTER:\n %+v\n", headerBuf)
 				log.Printf("BODYBUF AFTER:\n %+v\n", bodyBuf)
 
-				go ep.MessageHandler(msgBuf)
+				log.Printf("BODYBUF CAP and LEN AFTER: LEN: %d | CAP: %d\n", len(bodyBuf), cap(bodyBuf))
+				log.Printf("HEADERBUF CAP and LEN AFTER: LEN: %d | CAP: %d\n", len(headerBuf), cap(headerBuf))
 				break
 			}
 		}
