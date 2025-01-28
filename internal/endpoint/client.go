@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	router "message-broker/internal/router"
+	"message-broker/internal/message_queue"
 	msgType "message-broker/internal/types"
 	"message-broker/internal/utils"
 	"net"
@@ -41,19 +41,18 @@ func (ep Endpoint) MessageHandler(msgBuf bytes.Buffer) {
 	}
 
 	// type assertion switch statement for different processing
+
+	defer ep.Mux.Unlock()
 	switch msg := endpointMsg.(type) {
 	case msgType.EPMessage:
 		ep.Mux.Lock()
 		ep.handleEPMessage(msg)
-		ep.Mux.Unlock()
 	case msgType.Consumer:
 		ep.Mux.Lock()
 		ep.handleConsumers(msg)
-		ep.Mux.Unlock()
 	case msgType.Queue:
 		ep.Mux.Lock()
 		ep.handleQueueAssert(msg)
-		ep.Mux.Unlock()
 	default:
 		fmt.Println("ERROR: Unidentified type")
 		// ep.Conn.Write([]byte("ERROR: Unidentified type: Types should consist of EPMessage | Queue "))
@@ -64,7 +63,7 @@ func (ep Endpoint) MessageHandler(msgBuf bytes.Buffer) {
 
 func (ep Endpoint) handleConsumers(msg msgType.Consumer) {
 	log.Println("NOTIF: Consumer Message received")
-	table := router.GetRouteTable()
+	table := mq.GetMessageQueueTable()
 	r, exists := table[msg.Route]
 	if !exists {
 		log.Printf("ERROR: Message queue does not exist with specified route: %s\n", msg.Route)
@@ -86,16 +85,16 @@ When a route is matched within the RouteTable a type of Route will be accessible
 */
 func (ep Endpoint) handleQueueAssert(q msgType.Queue) {
 	log.Println("NOTIF: Queue Message received")
-	table := router.GetRouteTable()
+	table := mq.GetMessageQueueTable()
 	route, exists := table[q.Name]
 	if !exists {
-		table[q.Name] = &router.Route{
+		table[q.Name] = &mq.MessageQueue{
 			Type:        q.Type,
 			Name:        q.Name,
 			Durable:     q.Durable,
 			Connections: []net.Conn{},
 			// can change default size of message queue buffer size
-			MessageQueue: make(chan []byte, 50),
+			Queue: make(chan []byte, 50),
 		}
 		fmt.Printf("NOTIF: MESSAGE QUEUE CREATED: %s\n", q.Name)
 		go route.ListenMessages()
@@ -113,8 +112,8 @@ Handling Endpoint Messages
 */
 func (ep Endpoint) handleEPMessage(msg msgType.EPMessage) error {
 	log.Println("NOTIF: EP Message received")
-	table := router.GetRouteTable()
-	route, exists := table[msg.Route]
+	table := mq.GetMessageQueueTable()
+	msq, exists := table[msg.Route]
 	if !exists {
 		return fmt.Errorf("ERROR: A message for route: %s does not exist, either specify an existing route or create one using `AssertQueue`", msg.Route)
 	}
@@ -124,6 +123,6 @@ func (ep Endpoint) handleEPMessage(msg msgType.EPMessage) error {
 		return fmt.Errorf("ERROR: Unable to marshal client message for delivery")
 	}
 	appendedMsg, err := utils.AppendPrefixLength(m)
-	route.MessageQueue <- appendedMsg
+	msq.Queue <- appendedMsg
 	return nil
 }
