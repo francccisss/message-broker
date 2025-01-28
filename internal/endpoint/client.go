@@ -87,16 +87,21 @@ When a route is matched within the RouteTable a type of Route will be accessible
 func (ep Endpoint) handleQueueAssert(q msgType.Queue) {
 	log.Println("NOTIF: Queue Message received")
 	table := router.GetRouteTable()
-	_, exists := table[q.Name]
+	route, exists := table[q.Name]
 	if !exists {
 		table[q.Name] = &router.Route{
 			Type:        q.Type,
 			Name:        q.Name,
 			Durable:     q.Durable,
 			Connections: []net.Conn{},
+			// can change default size of message queue buffer size
+			MessageQueue: make(chan []byte, 50),
 		}
 		fmt.Printf("NOTIF: MESSAGE QUEUE CREATED: %s\n", q.Name)
+		go route.ListenMessages()
+		return
 	}
+	go route.ListenMessages()
 }
 
 /*
@@ -120,7 +125,5 @@ func (ep Endpoint) handleEPMessage(msg msgType.EPMessage) error {
 	}
 	appendedMsg, err := utils.AppendPrefixLength(m)
 	route.MessageQueue <- appendedMsg
-
-	// Queue up messages
 	return nil
 }

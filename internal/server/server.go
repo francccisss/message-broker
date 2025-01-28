@@ -102,22 +102,14 @@ func HandleConnections(c net.Conn) {
 				// connection so to handle excess bytes within the stream, we need to extract
 				// and place these excess bytes in to the header and the body buffers
 				if len(bodyBuf[remainingBytes:]) < HEADER_SIZE {
-					log.Println("LESS")
 					copy(headerBuf, bodyBuf)
 					bodyBuf = bodyBuf[:0]
 				} else {
-					log.Println("GREATER")
 					log.Printf("EXTRACTED HEADER LENGTH :%d\n", len(bodyBuf[remainingBytes:remainingBytes+HEADER_SIZE]))
 
 					copy(headerBuf, bodyBuf[remainingBytes:remainingBytes+HEADER_SIZE])
 					copy(bodyBuf, bodyBuf[remainingBytes+HEADER_SIZE:])
 				}
-				log.Printf("HEADER BUFF AFTER:\n %+v\n", headerBuf)
-				log.Printf("BODYBUF AFTER:\n %+v\n", bodyBuf)
-
-				log.Printf("BODYBUF CAP and LEN AFTER: LEN: %d | CAP: %d\n", len(bodyBuf), cap(bodyBuf))
-				log.Printf("HEADERBUF CAP and LEN AFTER: LEN: %d | CAP: %d\n", len(headerBuf), cap(headerBuf))
-				break
 			}
 		}
 	}

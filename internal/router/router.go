@@ -39,18 +39,16 @@ func GetRouteTable() map[string]*Route {
 // when new message is created place inside the messagequeue,
 func (r Route) ListenMessages() {
 	log.Printf("Route stats: \nRoute: %s, \nConnections: %d, \nPending Messages in Queue: %d", r.Name, len(r.Connections), len(r.MessageQueue))
-
-	for {
+	for _, c := range r.Connections {
+		// only read from channel buffer if there are connections in the route
 		message := <-r.MessageQueue
 		go func() {
 			r.m.Lock()
 			defer r.m.Unlock()
-			for _, c := range r.Connections {
-				_, err := c.Write(message)
-				if err != nil {
-					log.Println("ERROR: Unable to write to consumer")
-					return
-				}
+			_, err := c.Write(message)
+			if err != nil {
+				log.Println("ERROR: Unable to write to consumer")
+				return
 			}
 			log.Printf("Message sent for route %s: %s", r.Name, string(message))
 		}()
