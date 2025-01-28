@@ -10,7 +10,7 @@ import (
 	"sync"
 )
 
-const READ_SIZE = 100
+const READ_SIZE = 1024
 const HEADER_SIZE = 4
 
 type Server struct {
@@ -110,7 +110,6 @@ func HandleConnections(c net.Conn) {
 					log.Printf("EXTRACTED HEADER LENGTH :%d\n", len(bodyBuf[remainingBytes:remainingBytes+HEADER_SIZE]))
 
 					copy(headerBuf, bodyBuf[remainingBytes:remainingBytes+HEADER_SIZE])
-					// O^N
 					copy(bodyBuf, bodyBuf[remainingBytes+HEADER_SIZE:])
 				}
 				log.Printf("HEADER BUFF AFTER:\n %+v\n", headerBuf)

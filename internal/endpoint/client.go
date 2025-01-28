@@ -2,12 +2,12 @@ package client
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"log"
 	router "message-broker/internal/router"
 	msgType "message-broker/internal/types"
-	parser "message-broker/internal/utils"
-	"message-broker/internal/utils/queue"
+	"message-broker/internal/utils"
 	"net"
 	"sync"
 )
@@ -32,7 +32,7 @@ type EPHandler interface {
 }
 
 func (ep Endpoint) MessageHandler(msgBuf bytes.Buffer) {
-	endpointMsg, err := parser.MessageParser(msgBuf.Bytes())
+	endpointMsg, err := utils.MessageParser(msgBuf.Bytes())
 	// ERROR Handling
 	if err != nil {
 		log.Printf("ERROR: Unable to parse message")
@@ -72,7 +72,6 @@ func (ep Endpoint) handleConsumers(msg msgType.Consumer) {
 	}
 	r.Connections = append(r.Connections, ep.Conn)
 
-	ep.sendMessageToRoute(r)
 	log.Printf("NOTIF: Register consumer in route: %s\n", msg.Route)
 }
 
@@ -107,44 +106,21 @@ Handling Endpoint Messages
   - Use the Route property of the EPMessage to locate the appropriate Route
     within the Route Map
 */
-func (ep Endpoint) handleEPMessage(m msgType.EPMessage) error {
+func (ep Endpoint) handleEPMessage(msg msgType.EPMessage) error {
 	log.Println("NOTIF: EP Message received")
 	table := router.GetRouteTable()
-	route, exists := table[m.Route]
+	route, exists := table[msg.Route]
 	if !exists {
-		return fmt.Errorf("ERROR: A message for route: %s does not exist, either specify an existing route or create one using `AssertQueue`", m.Route)
+		return fmt.Errorf("ERROR: A message for route: %s does not exist, either specify an existing route or create one using `AssertQueue`", msg.Route)
 	}
+
+	m, err := json.Marshal(msg)
+	if err != nil {
+		return fmt.Errorf("ERROR: Unable to marshal client message for delivery")
+	}
+	appendedMsg, err := utils.AppendPrefixLength(m)
+	route.MessageQueue <- appendedMsg
 
 	// Queue up messages
-	route.MessageQueue.Enqueue(m.Body)
-	go ep.sendMessageToRoute(route)
 	return nil
-}
-
-// This is a go routine that will that should take in
-// Only send a message if there is a consumer, and if there is a message in the message queue
-// when new message is created place inside the messagequeue,
-func (ep Endpoint) sendMessageToRoute(route *router.Route) {
-	log.Printf("Number of connections in the current route: \nRoute: %s, \nConnections: %d, \nPending Messages in Queue: %d", route.Name, len(route.Connections), len(route.MessageQueue.GetItems()))
-	for i := range route.Connections {
-		// TESTING
-		// Sending messages concurrently to different connections
-		go func(index int, messages queue.Queue) {
-			for range len(messages.GetItems()) {
-				value, err := route.MessageQueue.Dequeue()
-				if err != nil {
-					log.Println(err.Error())
-					return
-				}
-				log.Printf("Message for route %s: %s", route.Name, string(value))
-			}
-		}(i, route.MessageQueue)
-		// Dequeuing Byte array
-		// _, err := c.Write(route.MessageQueue.Dequeue().([]byte))
-		// if err != nil {
-		// 	log.Println("ERROR: Unable to write to consumer")
-		// 	return err
-		// }
-
-	}
 }

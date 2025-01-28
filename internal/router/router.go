@@ -1,8 +1,9 @@
 package router
 
 import (
-	"message-broker/internal/utils/queue"
+	"log"
 	"net"
+	"sync"
 )
 
 /*
@@ -19,8 +20,9 @@ type Route struct {
 	// - Messages can only be pushed if there are connections
 	// - Messages enqueued and sent will not be availble afterwards
 	Connections  []net.Conn
-	MessageQueue queue.Queue
 	Durable      bool
+	m            *sync.Mutex
+	MessageQueue chan []byte
 }
 
 var table = map[string]*Route{}
@@ -30,4 +32,28 @@ type PubSub interface{}
 
 func GetRouteTable() map[string]*Route {
 	return table
+}
+
+// This is a go routine that will that should take in
+// Only send a message if there is a consumer, and if there is a message in the message queue
+// when new message is created place inside the messagequeue,
+func (r Route) ListenMessages() {
+	log.Printf("Route stats: \nRoute: %s, \nConnections: %d, \nPending Messages in Queue: %d", r.Name, len(r.Connections), len(r.MessageQueue))
+
+	for {
+		message := <-r.MessageQueue
+		go func() {
+			r.m.Lock()
+			defer r.m.Unlock()
+			for _, c := range r.Connections {
+				_, err := c.Write(message)
+				if err != nil {
+					log.Println("ERROR: Unable to write to consumer")
+					return
+				}
+			}
+			log.Printf("Message sent for route %s: %s", r.Name, string(message))
+		}()
+	}
+
 }
