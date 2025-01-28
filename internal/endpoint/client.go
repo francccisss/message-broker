@@ -131,7 +131,12 @@ func (ep Endpoint) sendMessageToRoute(route *router.Route) {
 		// Sending messages concurrently to different connections
 		go func(index int, messages queue.Queue) {
 			for range len(messages.GetItems()) {
-				log.Printf("Message for route %s: %s", route.Name, string(route.MessageQueue.Dequeue().([]byte)))
+				value, err := route.MessageQueue.Dequeue()
+				if err != nil {
+					log.Println(err.Error())
+					return
+				}
+				log.Printf("Message for route %s: %s", route.Name, string(value))
 			}
 		}(i, route.MessageQueue)
 		// Dequeuing Byte array

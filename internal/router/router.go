@@ -13,8 +13,11 @@ handling the multiplexing/demultiplexing using a `message dispatcher`
 */
 
 type Route struct {
-	Type         string
-	Name         string
+	Type string
+	Name string
+	// TODO Need to handle disconnected clients
+	// - Messages can only be pushed if there are connections
+	// - Messages enqueued and sent will not be availble afterwards
 	Connections  []net.Conn
 	MessageQueue queue.Queue
 	Durable      bool
