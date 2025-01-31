@@ -42,17 +42,19 @@ func (ep Endpoint) MessageHandler(msgBuf bytes.Buffer) {
 
 	// type assertion switch statement for different processing
 
-	defer ep.Mux.Unlock()
 	switch msg := endpointMsg.(type) {
 	case msgType.EPMessage:
 		ep.Mux.Lock()
 		ep.handleEPMessage(msg)
+		ep.Mux.Unlock()
 	case msgType.Consumer:
 		ep.Mux.Lock()
 		ep.handleConsumers(msg)
+		ep.Mux.Unlock()
 	case msgType.Queue:
 		ep.Mux.Lock()
 		ep.handleQueueAssert(msg)
+		ep.Mux.Unlock()
 	default:
 		fmt.Println("ERROR: Unidentified type")
 		// ep.Conn.Write([]byte("ERROR: Unidentified type: Types should consist of EPMessage | Queue "))
@@ -86,21 +88,23 @@ When a route is matched within the RouteTable a type of Route will be accessible
 func (ep Endpoint) handleQueueAssert(q msgType.Queue) {
 	log.Println("NOTIF: Queue Message received")
 	table := mq.GetMessageQueueTable()
-	route, exists := table[q.Name]
+	_, exists := table[q.Name]
 	if !exists {
-		table[q.Name] = &mq.MessageQueue{
-			Type:        q.Type,
-			Name:        q.Name,
-			Durable:     q.Durable,
-			Connections: []net.Conn{},
-			// can change default size of message queue buffer size
-			Queue: make(chan []byte, 50),
-		}
+		newMq :=
+			&mq.MessageQueue{
+				Type:        q.Type,
+				Name:        q.Name,
+				Durable:     q.Durable,
+				Connections: []net.Conn{},
+				// can change default size of message queue buffer size
+				Queue: make(chan []byte, 50),
+			}
+		table[q.Name] = newMq
 		fmt.Printf("NOTIF: MESSAGE QUEUE CREATED: %s\n", q.Name)
-		go route.ListenMessages()
+		go newMq.ListenMessages()
 		return
 	}
-	go route.ListenMessages()
+	fmt.Printf("NOTIF: MESSAGE QUEUE ALREADY EXISTS: %s\n", q.Name)
 }
 
 /*
@@ -123,6 +127,11 @@ func (ep Endpoint) handleEPMessage(msg msgType.EPMessage) error {
 		return fmt.Errorf("ERROR: Unable to marshal client message for delivery")
 	}
 	appendedMsg, err := utils.AppendPrefixLength(m)
+	if err != nil {
+		return err
+	}
+	msq.Notif <- 1
 	msq.Queue <- appendedMsg
+	msq.Log()
 	return nil
 }

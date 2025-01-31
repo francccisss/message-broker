@@ -26,12 +26,15 @@ type Queue struct {
 	Name        string
 	Type        string
 	Durable     bool
+	StreamID    string
 }
 
 type EPMessage struct {
 	MessageType string
 	Route       string
 	Body        []byte
+	Type        string
+	StreamID    string
 }
 
 type Consumer struct {
@@ -41,4 +44,5 @@ type Consumer struct {
 type ErrorMessage struct {
 	MessageType string
 	Body        []byte
+	StreamID    string
 }
