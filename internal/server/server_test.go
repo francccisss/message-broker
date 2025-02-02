@@ -1,6 +1,7 @@
 package server_test
 
 import (
+	"fmt"
 	"log"
 	"message-broker/internal/server"
 	"testing"
@@ -13,14 +14,14 @@ func TestServerConnections(t *testing.T) {
 	serverState := make(chan error)
 	s := server.NewServer("", "5671", serverState)
 	s.ServeTCP()
-	s.ListenIncomingSegments()
+	s.ListenConnections()
 	state := <-serverState
 
 	if state != nil {
-		log.Println("Exiting application")
+		fmt.Println("Exiting application")
 		log.Panicln(state.Error())
 	}
-	log.Println("Servert shutdown")
+	fmt.Println("Servert shutdown")
 }
 
 func TestEndpointDelivery(t *testing.T) {

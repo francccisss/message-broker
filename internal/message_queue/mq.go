@@ -1,7 +1,7 @@
 package mq
 
 import (
-	"log"
+	"fmt"
 	"net"
 	"sync"
 )
@@ -53,7 +53,7 @@ When there are client > 0 connected, message is sent
 When there are no connections message stays in the queue
 */
 func (mq MessageQueue) ListenMessages() {
-	log.Println("NOTIF: New Listener spawned")
+	fmt.Println("NOTIF: New Listener spawned")
 	mq.Log()
 	for {
 
@@ -63,22 +63,22 @@ func (mq MessageQueue) ListenMessages() {
 		// Using Notif to check if connecttions exists before sending out messages
 		<-mq.Notif
 
-		log.Println("NOTIF: New message received")
+		fmt.Println("NOTIF: New message received")
 		if len(mq.Connections) > 0 {
-			log.Println("NOTIF: There are 0 connections")
+			fmt.Println("NOTIF: There are 0 connections")
 			continue
 		}
-		log.Println("NOTIF: Sending messages")
+		fmt.Println("NOTIF: Sending messages")
 		message := <-mq.Queue
-		log.Printf("NOTIF: Total messages to be sent%d", len(mq.Queue))
+		fmt.Printf("NOTIF: Total messages to be sent%d", len(mq.Queue))
 		for _, c := range mq.Connections {
 			go func() {
 				_, err := c.Write(message)
 				if err != nil {
-					log.Println("ERROR: Unable to write to consumer")
+					fmt.Println("ERROR: Unable to write to consumer")
 					return
 				}
-				log.Printf("NOTIF: Message sent for route %s: %s", mq.Name, string(message))
+				fmt.Printf("NOTIF: Message sent for route %s: %s", mq.Name, string(message))
 			}()
 		}
 	}
@@ -86,6 +86,6 @@ func (mq MessageQueue) ListenMessages() {
 }
 
 func (mq *MessageQueue) Log() {
-	log.Printf("ROUTE_STATS: \nRoute: %s, \nConnections: %d, \nPending Messages in Queue: %d", mq.Name, len(mq.Connections), len(mq.Queue))
+	fmt.Printf("Messsage Queue Stats: \n |-Route: %s, \n |-Connections: %d, \n |-Pending Messages in Queue: %d\n", mq.Name, len(mq.Connections), len(mq.Queue))
 
 }

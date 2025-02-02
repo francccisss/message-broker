@@ -4,8 +4,8 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
-	// "fmt"
-	"log"
+	"fmt"
+	// "log"
 	"math"
 	client "message-broker/internal/endpoint"
 	"net"
@@ -31,20 +31,20 @@ func NewServer(addr string, port string, state chan error) Server {
 func (s *Server) ServeTCP() {
 	ln, err := net.Listen("tcp", ":"+s.port)
 	if err != nil {
-		log.Println("ERROR: Unable to start TCP server.")
+		fmt.Println("ERROR: Unable to start TCP server.")
 		s.serverState <- err
 	}
 	s.ln = ln
-	log.Printf("NOTIF: Server Success Listen to %s:%s", "localhost", s.port)
+	fmt.Printf("NOTIF: Server Success Listen to %s:%s\n", "localhost", s.port)
 }
-func (s *Server) ListenIncomingSegments() {
-	log.Println("NOTIF: Accepting connections")
+func (s *Server) ListenConnections() {
+	fmt.Println("NOTIF: Accepting connections")
 	for {
 		c, err := s.ln.Accept()
-		log.Println("NOTIF: Client connected")
+		fmt.Println("NOTIF: Client connected")
 		if err != nil {
 			s.serverState <- err
-			log.Println("ERROR: Unable to accept new TCP connections")
+			fmt.Println("ERROR: Unable to accept new TCP connections")
 		}
 		go HandleIncomingRequests(c)
 	}
@@ -70,17 +70,17 @@ func HandleIncomingRequests(c net.Conn) {
 		var msgBuf bytes.Buffer
 		_, err := c.Read(headerBuf)
 		if err != nil {
-			log.Println("ERROR: Unable to decode header prefix length")
+			fmt.Println("ERROR: Unable to decode header prefix length")
 			return
 		}
 
 		expectedMsgLength := int(binary.LittleEndian.Uint32(headerBuf[:HEADER_SIZE]))
-		log.Printf("Prefix Length Receieved: %d\n", expectedMsgLength)
+		fmt.Printf("Prefix Length Receieved: %d\n", expectedMsgLength)
 		for {
 			bodyBuf := make([]byte, readSize)
 			_, err := connBufReader.Read(bodyBuf)
 			if err != nil {
-				log.Printf("ERROR: Unable to read the incoming message body ")
+				fmt.Printf("ERROR: Unable to read the incoming message body ")
 				break
 			}
 
@@ -88,7 +88,7 @@ func HandleIncomingRequests(c net.Conn) {
 			// msgBuf (msgBuf is the current accumulated requested stream from client)
 			_, err = msgBuf.Write(bodyBuf[:])
 			if err != nil {
-				log.Printf("ERROR: Unable to write incoming bytes to the message buffer ")
+				fmt.Printf("ERROR: Unable to write incoming bytes to the message buffer ")
 				break
 			}
 
@@ -99,13 +99,11 @@ func HandleIncomingRequests(c net.Conn) {
 			// return n bytes up to the length of the remaining bytes of the current message.
 			readSize = int(math.Min(float64(expectedMsgLength-msgBuf.Len()), float64(readSize)))
 
-			log.Printf("NOTIF: Current total in msgbuf: %+v\n", msgBuf.Len())
-			log.Printf("NOTIF: Remaining bytes needed: %+v\n", expectedMsgLength-msgBuf.Len())
 			// finishes the current stream request
 			if msgBuf.Len() == expectedMsgLength {
 				go ep.MessageHandler(msgBuf)
 				readSize = DEFAULT_READ_SIZE
-				log.Println("NOTIF: Message sequence complete.")
+				fmt.Println("NOTIF: Message sequence complete.")
 				break
 			}
 		}

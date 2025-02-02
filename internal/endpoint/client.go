@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
 	"message-broker/internal/message_queue"
 	msgType "message-broker/internal/types"
 	"message-broker/internal/utils"
@@ -35,8 +34,8 @@ func (ep Endpoint) MessageHandler(msgBuf bytes.Buffer) {
 	endpointMsg, err := utils.MessageParser(msgBuf.Bytes())
 	// ERROR Handling
 	if err != nil {
-		log.Printf("ERROR: Unable to parse message")
-		log.Println(err.Error())
+		fmt.Printf("ERROR: Unable to parse message")
+		fmt.Println(err.Error())
 		return
 	}
 
@@ -64,16 +63,16 @@ func (ep Endpoint) MessageHandler(msgBuf bytes.Buffer) {
 }
 
 func (ep Endpoint) handleConsumers(msg msgType.Consumer) {
-	log.Println("NOTIF: Consumer Message received")
+	fmt.Println("NOTIF: Consumer Message received")
 	table := mq.GetMessageQueueTable()
 	r, exists := table[msg.Route]
 	if !exists {
-		log.Printf("ERROR: Message queue does not exist with specified route: %s\n", msg.Route)
+		fmt.Printf("ERROR: Message queue does not exist with specified route: %s\n", msg.Route)
 		return
 	}
 	r.Connections = append(r.Connections, ep.Conn)
 
-	log.Printf("NOTIF: Register consumer in route: %s\n", msg.Route)
+	fmt.Printf("NOTIF: Register consumer in route: %s\n", msg.Route)
 }
 
 /*
@@ -86,7 +85,7 @@ When a route is matched within the RouteTable a type of Route will be accessible
   - an error is thrown if no route matched with the message Route
 */
 func (ep Endpoint) handleQueueAssert(q msgType.Queue) {
-	log.Println("NOTIF: Queue Message received")
+	fmt.Println("NOTIF: Queue Message received")
 	table := mq.GetMessageQueueTable()
 	_, exists := table[q.Name]
 	if !exists {
@@ -115,7 +114,7 @@ Handling Endpoint Messages
     within the Route Map
 */
 func (ep Endpoint) handleEPMessage(msg msgType.EPMessage) error {
-	log.Println("NOTIF: EP Message received")
+	fmt.Println("NOTIF: EP Message received")
 	table := mq.GetMessageQueueTable()
 	msq, exists := table[msg.Route]
 	if !exists {
