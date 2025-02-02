@@ -35,31 +35,42 @@ func GetMessageQueueTable() map[string]*MessageQueue {
 	return table
 }
 
-// This is a go routine that will that should take in
-// Only send a message if there is a consumer, and if there is a message in the message queue
-// when new message is created place inside the messagequeue,
-//
-// When a new route message queue is created, the message queue listens to new messages
-// within its own route, the MessageQueue is where data is queued and pushed
-// to connected clients for consumption
+/*
+This is a go routine Message Listener that will ONLY send a message
+if a consumer exists, and will only queue up messages until there is
+> 0 consumers in the mq.Connections field
 
-// When there are client > 0 connected, message is sent
-// When there are no connections message stays in the queue
+If a message queue already exists, connections will be stored to the existing
+one, else it will create a new queue when AssertQueue is called by the client
+
+When a new message queue is created via AssertQueue in the client side,
+a new Listener will be spawned to listen to incoming messages, and pushed
+to consumers that are defined in the mq.Connections, the Connections field
+in a message queue stores an array of client connections, where messages
+will be sent for consumption
+
+When there are client > 0 connected, message is sent
+When there are no connections message stays in the queue
+*/
 func (mq MessageQueue) ListenMessages() {
 	log.Println("NOTIF: New Listener spawned")
 	mq.Log()
 	for {
 
 		// only read from channel buffer if there are connections in the route
-		// else requeue if empty
-		// Using Notif to check if connecttion exists before sending out messages
+		// else do nothing if empty
+
+		// Using Notif to check if connecttions exists before sending out messages
 		<-mq.Notif
+
+		log.Println("NOTIF: New message received")
 		if len(mq.Connections) > 0 {
 			log.Println("NOTIF: There are 0 connections")
 			continue
 		}
-		log.Println("NOTIF: Sending message")
+		log.Println("NOTIF: Sending messages")
 		message := <-mq.Queue
+		log.Printf("NOTIF: Total messages to be sent%d", len(mq.Queue))
 		for _, c := range mq.Connections {
 			go func() {
 				_, err := c.Write(message)

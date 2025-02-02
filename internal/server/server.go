@@ -55,7 +55,6 @@ Logic body for handling different message types and distributing to different pe
   - Endpoint messages will be handled by 'HandleEPMessage()'
   - Queue assertion will be handled by 'HandleQueueAssert()'
 */
-
 func HandleIncomingRequests(c net.Conn) {
 	var mux sync.Mutex
 	connBufReader := bufio.NewReader(c)
@@ -100,12 +99,13 @@ func HandleIncomingRequests(c net.Conn) {
 			// return n bytes up to the length of the remaining bytes of the current message.
 			readSize = int(math.Min(float64(expectedMsgLength-msgBuf.Len()), float64(readSize)))
 
-			log.Printf("CURRENT TOTAL IN MSGBUF: %+v\n", msgBuf.Len())
-			log.Printf("REMAINING BYTES NEEDED: %+v\n", expectedMsgLength-msgBuf.Len())
+			log.Printf("NOTIF: Current total in msgbuf: %+v\n", msgBuf.Len())
+			log.Printf("NOTIF: Remaining bytes needed: %+v\n", expectedMsgLength-msgBuf.Len())
 			// finishes the current stream request
 			if msgBuf.Len() == expectedMsgLength {
 				go ep.MessageHandler(msgBuf)
 				readSize = DEFAULT_READ_SIZE
+				log.Println("NOTIF: Message sequence complete.")
 				break
 			}
 		}
