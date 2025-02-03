@@ -64,15 +64,15 @@ func (ep Endpoint) MessageHandler(msgBuf bytes.Buffer) {
 
 func (ep Endpoint) handleConsumers(msg msgType.Consumer) {
 	fmt.Println("NOTIF: Consumer Message received")
-	table := mq.GetMessageQueueTable()
-	r, exists := table[msg.Route]
+	messageQueueTable := mq.GetMessageQueueTable()
+	msq, exists := messageQueueTable[msg.Route]
 	if !exists {
 		fmt.Printf("ERROR: Message queue does not exist with specified route: %s\n", msg.Route)
 		return
 	}
-	r.Connections = append(r.Connections, ep.Conn)
-
-	fmt.Printf("NOTIF: Register consumer in route: %s\n", msg.Route)
+	msq.Connections = append(msq.Connections, ep.Conn)
+	fmt.Printf("NOTIF: Register consumer in route: %s\n", msq.Name)
+	msq.Log()
 }
 
 /*

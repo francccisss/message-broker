@@ -52,16 +52,16 @@ will be sent for consumption
 When there are client > 0 connected, message is sent
 When there are no connections message stays in the queue
 */
-func (mq MessageQueue) ListenMessages() {
+func (mq *MessageQueue) ListenMessages() {
 	fmt.Println("NOTIF: New Listener spawned")
 	mq.Log()
-	for {
 
-		// only read from channel buffer if there are connections in the route
-		// else do nothing if empty
+	// only read from channel buffer if there are connections in the route
+	// else do nothing if empty
 
-		// Using Notif to check if connecttions exists before sending out messages
-		<-mq.Notif
+	// Using Notif to check if connecttions exists before sending out messages
+
+	for range <-mq.Notif {
 
 		fmt.Println("NOTIF: New message received")
 		if len(mq.Connections) > 0 {

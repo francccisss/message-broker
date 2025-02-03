@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/binary"
 	"fmt"
@@ -54,10 +53,12 @@ func (s *Server) ListenConnections() {
 Logic body for handling different message types and distributing to different performers
   - Endpoint messages will be handled by 'HandleEPMessage()'
   - Queue assertion will be handled by 'HandleQueueAssert()'
+
+TODO Fix: next incoming request is stopped for some odd reason
 */
 func HandleIncomingRequests(c net.Conn) {
+	defer fmt.Println("Exiting incoming request handler for some reason.")
 	var mux sync.Mutex
-	connBufReader := bufio.NewReader(c)
 
 	ep := client.Endpoint{Mux: &mux, Conn: c}
 	defer c.Close()
@@ -76,9 +77,10 @@ func HandleIncomingRequests(c net.Conn) {
 
 		expectedMsgLength := int(binary.LittleEndian.Uint32(headerBuf[:HEADER_SIZE]))
 		fmt.Printf("Prefix Length Receieved: %d\n", expectedMsgLength)
+		fmt.Printf("Prefix Length in Bytes: %+v\n", headerBuf[:HEADER_SIZE])
 		for {
 			bodyBuf := make([]byte, readSize)
-			_, err := connBufReader.Read(bodyBuf)
+			_, err := c.Read(bodyBuf)
 			if err != nil {
 				fmt.Printf("ERROR: Unable to read the incoming message body ")
 				break
