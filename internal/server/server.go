@@ -13,7 +13,7 @@ import (
 
 const (
 	HEADER_SIZE       = 4
-	DEFAULT_READ_SIZE = 50
+	DEFAULT_READ_SIZE = 1024
 )
 
 type Server struct {
@@ -55,6 +55,7 @@ Logic body for handling different message types and distributing to different pe
   - Queue assertion will be handled by 'HandleQueueAssert()'
 
 TODO Fix: next incoming request is stopped for some odd reason
+Fix: readSize is negative when using math.Min
 */
 func HandleIncomingRequests(c net.Conn) {
 	defer fmt.Println("Exiting incoming request handler for some reason.")
@@ -66,7 +67,6 @@ func HandleIncomingRequests(c net.Conn) {
 	// fixed sized header length to extract from message stream
 	// Outer loop will always take 4 iterations
 	headerBuf := make([]byte, HEADER_SIZE)
-	readSize := DEFAULT_READ_SIZE
 	for {
 		var msgBuf bytes.Buffer
 		_, err := c.Read(headerBuf)
@@ -76,10 +76,24 @@ func HandleIncomingRequests(c net.Conn) {
 		}
 
 		expectedMsgLength := int(binary.LittleEndian.Uint32(headerBuf[:HEADER_SIZE]))
+
+		// Initial read size to check if whether incoming request exceeds
+		// current read size then read up to DEFAULT_READ_SIZE else only
+		// up to remaning bytes to be read instead
+		// This formula returns the minimum int between the two, if there is space
+		// to fit the stream of bytes in the bodyBuf then return current readSize which is the DEFAULT_READ_SIZE
+		// else if current readSize is greater than the remaining bytes left from the expected message
+		// return n bytes up to the length of the remaining bytes of the current message.
+		currentReadSize := int(math.Min(float64(expectedMsgLength-msgBuf.Len()), float64(DEFAULT_READ_SIZE)))
+
+		fmt.Printf("NOTIF: Current Read Size %d\n", currentReadSize)
 		fmt.Printf("Prefix Length Receieved: %d\n", expectedMsgLength)
 		fmt.Printf("Prefix Length in Bytes: %+v\n", headerBuf[:HEADER_SIZE])
 		for {
-			bodyBuf := make([]byte, readSize)
+
+			// creates a buffer up to the calculated readSize
+			bodyBuf := make([]byte, currentReadSize)
+
 			_, err := c.Read(bodyBuf)
 			if err != nil {
 				fmt.Printf("ERROR: Unable to read the incoming message body ")
@@ -94,17 +108,16 @@ func HandleIncomingRequests(c net.Conn) {
 				break
 			}
 
-			// Updates the readsize for the next stream of bytes to be captured in bulk
-			// This formula returns the minimum int between the two, if there is space
-			// to fit the stream of bytes in the bodyBuf then return current readSize which is the DEFAULT_READ_SIZE
-			// else if current readSize is greater than the remaining bytes left from the expected message
-			// return n bytes up to the length of the remaining bytes of the current message.
-			readSize = int(math.Min(float64(expectedMsgLength-msgBuf.Len()), float64(readSize)))
+			// Updates the readSize for the next bytes to be read
+			remainingBytesLen := expectedMsgLength - msgBuf.Len()
+			if currentReadSize < remainingBytesLen {
+				currentReadSize = remainingBytesLen
+			}
+			fmt.Printf("NOTIF: Remaining bytes left %d\n", currentReadSize)
 
 			// finishes the current stream request
 			if msgBuf.Len() == expectedMsgLength {
 				go ep.MessageHandler(msgBuf)
-				readSize = DEFAULT_READ_SIZE
 				fmt.Println("NOTIF: Message sequence complete.")
 				break
 			}
