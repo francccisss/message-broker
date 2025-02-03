@@ -22,7 +22,7 @@ type MessageQueue struct {
 	Connections []net.Conn
 	Durable     bool
 	Queue       chan []byte
-	Notif       chan uint32
+	Notif       chan struct{}
 	m           *sync.Mutex
 }
 
@@ -56,21 +56,22 @@ func (mq *MessageQueue) ListenMessages() {
 	fmt.Println("NOTIF: New Listener spawned")
 	mq.Log()
 
-	// only read from channel buffer if there are connections in the route
-	// else do nothing if empty
+	for {
 
-	// Using Notif to check if connecttions exists before sending out messages
+		// ONLY READ FROM CHANNEL BUFFER IF THERE ARE CONNECTIONS IN THE ROUTE
+		// ELSE DO NOTHING IF EMPTY
 
-	for range <-mq.Notif {
-
+		// Using Notif to check if connecttions exists before sending out messages
+		<-mq.Notif
+		fmt.Printf("NOTIF: Current Connections %d", len(mq.Connections))
 		fmt.Println("NOTIF: New message received")
-		if len(mq.Connections) > 0 {
+		if len(mq.Connections) < 1 {
 			fmt.Println("NOTIF: There are 0 connections")
 			continue
 		}
 		fmt.Println("NOTIF: Sending messages")
 		message := <-mq.Queue
-		fmt.Printf("NOTIF: Total messages to be sent%d", len(mq.Queue))
+		fmt.Printf("NOTIF: Total messages to be sent %d\n", len(mq.Queue))
 		for _, c := range mq.Connections {
 			go func() {
 				_, err := c.Write(message)
@@ -78,7 +79,7 @@ func (mq *MessageQueue) ListenMessages() {
 					fmt.Println("ERROR: Unable to write to consumer")
 					return
 				}
-				fmt.Printf("NOTIF: Message sent for route %s: %s", mq.Name, string(message))
+				fmt.Printf("NOTIF: Message sent for route %s: %s\n", mq.Name, string(message))
 			}()
 		}
 	}

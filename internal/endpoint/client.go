@@ -95,6 +95,7 @@ func (ep Endpoint) handleQueueAssert(q msgType.Queue) {
 				Name:        q.Name,
 				Durable:     q.Durable,
 				Connections: []net.Conn{},
+				Notif:       make(chan struct{}),
 				// can change default size of message queue buffer size
 				Queue: make(chan []byte, 50),
 			}
@@ -129,7 +130,7 @@ func (ep Endpoint) handleEPMessage(msg msgType.EPMessage) error {
 	if err != nil {
 		return err
 	}
-	msq.Notif <- 1
+	msq.Notif <- struct{}{}
 	msq.Queue <- appendedMsg
 	msq.Log()
 	return nil

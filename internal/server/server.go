@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
+
 	// "log"
 	"math"
 	client "message-broker/internal/endpoint"
@@ -53,12 +55,9 @@ func (s *Server) ListenConnections() {
 Logic body for handling different message types and distributing to different performers
   - Endpoint messages will be handled by 'HandleEPMessage()'
   - Queue assertion will be handled by 'HandleQueueAssert()'
-
-TODO Fix: next incoming request is stopped for some odd reason
-Fix: readSize is negative when using math.Min
 */
 func HandleIncomingRequests(c net.Conn) {
-	defer fmt.Println("Exiting incoming request handler for some reason.")
+	defer fmt.Println("NOTIF: Exiting request listener")
 	var mux sync.Mutex
 
 	ep := client.Endpoint{Mux: &mux, Conn: c}
@@ -71,8 +70,10 @@ func HandleIncomingRequests(c net.Conn) {
 		var msgBuf bytes.Buffer
 		_, err := c.Read(headerBuf)
 		if err != nil {
-			fmt.Println("ERROR: Unable to decode header prefix length")
-			return
+			if err == io.EOF {
+				fmt.Println("ERROR: Client has abrubtly terminated the connection")
+				return
+			}
 		}
 
 		expectedMsgLength := int(binary.LittleEndian.Uint32(headerBuf[:HEADER_SIZE]))
@@ -86,9 +87,7 @@ func HandleIncomingRequests(c net.Conn) {
 		// return n bytes up to the length of the remaining bytes of the current message.
 		currentReadSize := int(math.Min(float64(expectedMsgLength-msgBuf.Len()), float64(DEFAULT_READ_SIZE)))
 
-		fmt.Printf("NOTIF: Current Read Size %d\n", currentReadSize)
-		fmt.Printf("Prefix Length Receieved: %d\n", expectedMsgLength)
-		fmt.Printf("Prefix Length in Bytes: %+v\n", headerBuf[:HEADER_SIZE])
+		fmt.Printf("NOTIF: Prefix Length Receieved: %d\n", expectedMsgLength)
 		for {
 
 			// creates a buffer up to the calculated readSize
@@ -113,8 +112,6 @@ func HandleIncomingRequests(c net.Conn) {
 			if currentReadSize < remainingBytesLen {
 				currentReadSize = remainingBytesLen
 			}
-			fmt.Printf("NOTIF: Remaining bytes left %d\n", currentReadSize)
-
 			// finishes the current stream request
 			if msgBuf.Len() == expectedMsgLength {
 				go ep.MessageHandler(msgBuf)
