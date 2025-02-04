@@ -7,6 +7,7 @@ import (
 	"message-broker/internal/message_queue"
 	msgType "message-broker/internal/types"
 	"message-broker/internal/utils"
+	"message-broker/internal/utils/queue"
 	"net"
 	"sync"
 )
@@ -42,13 +43,13 @@ func (ep Endpoint) MessageHandler(msgBuf bytes.Buffer) {
 	// type assertion switch statement for different processing
 
 	switch msg := endpointMsg.(type) {
-	case msgType.EPMessage:
-		ep.Mux.Lock()
-		ep.handleEPMessage(msg)
-		ep.Mux.Unlock()
 	case msgType.Consumer:
 		ep.Mux.Lock()
 		ep.handleConsumers(msg)
+		ep.Mux.Unlock()
+	case msgType.EPMessage:
+		ep.Mux.Lock()
+		ep.handleEPMessage(msg)
 		ep.Mux.Unlock()
 	case msgType.Queue:
 		ep.Mux.Lock()
@@ -73,6 +74,7 @@ func (ep Endpoint) handleConsumers(msg msgType.Consumer) {
 	msq.Connections = append(msq.Connections, ep.Conn)
 	fmt.Printf("NOTIF: Register consumer in route: %s\n", msq.Name)
 	msq.Log()
+	msq.Notif <- struct{}{}
 }
 
 /*
@@ -96,8 +98,7 @@ func (ep Endpoint) handleQueueAssert(q msgType.Queue) {
 				Durable:     q.Durable,
 				Connections: []net.Conn{},
 				Notif:       make(chan struct{}),
-				// can change default size of message queue buffer size
-				Queue: make(chan []byte, 50),
+				Queue:       queue.Queue{},
 			}
 		table[q.Name] = newMq
 		fmt.Printf("NOTIF: MESSAGE QUEUE CREATED: %s\n", q.Name)
@@ -130,8 +131,9 @@ func (ep Endpoint) handleEPMessage(msg msgType.EPMessage) error {
 	if err != nil {
 		return err
 	}
-	msq.Notif <- struct{}{}
-	msq.Queue <- appendedMsg
+	msq.Queue.Enqueue(appendedMsg)
+	fmt.Println("NOTIF: New message in queue")
 	msq.Log()
+	msq.Notif <- struct{}{}
 	return nil
 }

@@ -7,17 +7,11 @@ func (q *Queue) Enqueue(i []byte) {
 	*q = append(*q, i)
 }
 
-func (q *Queue) GetItems() Queue {
-	return *q
-}
-
 func (q *Queue) Dequeue() []byte {
 	if len(*q) == 0 {
 		return []byte{}
 	}
-
-	tmp := *q
-	front := tmp[0]
-	*q = tmp[1:]
+	front := (*q)[0]
+	*q = (*q)[1:]
 	return front
 }

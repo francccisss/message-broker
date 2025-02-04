@@ -2,6 +2,7 @@ package mq
 
 import (
 	"fmt"
+	"message-broker/internal/utils/queue"
 	"net"
 	"sync"
 )
@@ -21,7 +22,7 @@ type MessageQueue struct {
 	// - Messages enqueued and sent will not be availble afterwards
 	Connections []net.Conn
 	Durable     bool
-	Queue       chan []byte
+	Queue       queue.Queue
 	Notif       chan struct{}
 	m           *sync.Mutex
 }
@@ -56,37 +57,38 @@ func (mq *MessageQueue) ListenMessages() {
 	fmt.Println("NOTIF: New Listener spawned")
 	mq.Log()
 
-	for {
+	for range mq.Notif {
+		// Listener is notified when there are new consumers, and or there are new messages
+		// when message queue was full wit messages, and connections are present
+		// the first notificaion will send all of the messages, so every subsequent
+		// notifications wont do anything
 
-		// ONLY READ FROM CHANNEL BUFFER IF THERE ARE CONNECTIONS IN THE ROUTE
-		// ELSE DO NOTHING IF EMPTY
-
-		// Using Notif to check if connecttions exists before sending out messages
-		<-mq.Notif
-		fmt.Printf("NOTIF: Current Connections %d", len(mq.Connections))
-		fmt.Println("NOTIF: New message received")
+		fmt.Println("NOTIF: Checking connections before sending messages...")
+		fmt.Printf("NOTIF: Current Connections %d\n", len(mq.Connections))
 		if len(mq.Connections) < 1 {
 			fmt.Println("NOTIF: There are 0 connections")
 			continue
 		}
 		fmt.Println("NOTIF: Sending messages")
-		message := <-mq.Queue
 		fmt.Printf("NOTIF: Total messages to be sent %d\n", len(mq.Queue))
-		for _, c := range mq.Connections {
-			go func() {
-				_, err := c.Write(message)
-				if err != nil {
-					fmt.Println("ERROR: Unable to write to consumer")
-					return
-				}
-				fmt.Printf("NOTIF: Message sent for route %s: %s\n", mq.Name, string(message))
-			}()
+		for range mq.Queue {
+			message := mq.Queue.Dequeue()
+			for _, c := range mq.Connections {
+				go func() {
+					_, err := c.Write(message)
+					if err != nil {
+						fmt.Println(err.Error())
+						fmt.Println("ERROR: Unable to write to consumer")
+						return
+					}
+					fmt.Printf("NOTIF: Message sent for route %s: %+v\n", mq.Name, message[:4])
+				}()
+			}
 		}
+		fmt.Println("NOTIF: Messages sent")
 	}
-
 }
 
 func (mq *MessageQueue) Log() {
 	fmt.Printf("Messsage Queue Stats: \n |-Route: %s, \n |-Connections: %d, \n |-Pending Messages in Queue: %d\n", mq.Name, len(mq.Connections), len(mq.Queue))
-
 }
