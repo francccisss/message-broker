@@ -5,8 +5,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-
-	// "log"
 	"math"
 	client "message-broker/internal/endpoint"
 	"net"
@@ -57,7 +55,6 @@ Logic body for handling different message types and distributing to different pe
   - Queue assertion will be handled by 'HandleQueueAssert()'
 */
 func HandleIncomingRequests(c net.Conn) {
-	defer fmt.Println("NOTIF: Exiting request listener")
 	var mux sync.Mutex
 
 	ep := client.Endpoint{Mux: &mux, Conn: c}
@@ -71,7 +68,7 @@ func HandleIncomingRequests(c net.Conn) {
 		_, err := c.Read(headerBuf)
 		if err != nil {
 			if err == io.EOF {
-				fmt.Println("ERROR: Client has abrubtly terminated the connection")
+				fmt.Println("NOTIF: Client has abrubtly terminated the connection")
 				return
 			}
 		}

@@ -69,7 +69,7 @@ func (mq *MessageQueue) ListenMessages() {
 			fmt.Println("NOTIF: There are 0 connections")
 			continue
 		}
-		fmt.Println("NOTIF: Sending messages")
+		fmt.Println("NOTIF: Sending messages...")
 		fmt.Printf("NOTIF: Total messages to be sent %d\n", len(mq.Queue))
 		for range mq.Queue {
 			message := mq.Queue.Dequeue()
