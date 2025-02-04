@@ -1,6 +1,7 @@
 package mq
 
 import (
+	"errors"
 	"fmt"
 	"message-broker/internal/utils/queue"
 	"net"
@@ -20,11 +21,16 @@ type MessageQueue struct {
 	// TODO Need to handle disconnected clients
 	// - Messages can only be pushed if there are connections
 	// - Messages enqueued and sent will not be availble afterwards
-	Connections []net.Conn
-	Durable     bool
-	Queue       queue.Queue
-	Notif       chan struct{}
-	m           *sync.Mutex
+	Connections   map[string]*ConsumerConnection
+	ConnectionIDs []string
+	Durable       bool
+	Queue         queue.Queue
+	Notif         chan struct{}
+	M             *sync.Mutex
+}
+type ConsumerConnection struct {
+	Conn         net.Conn
+	ConnectionID string
 }
 
 var table = map[string]*MessageQueue{}
@@ -58,6 +64,9 @@ func (mq *MessageQueue) ListenMessages() {
 	mq.Log()
 
 	for range mq.Notif {
+		// Handling disconnected clients
+		disconnectedClients := []string{}
+
 		// Listener is notified when there are new consumers, and or there are new messages
 		// when message queue was full wit messages, and connections are present
 		// the first notificaion will send all of the messages, so every subsequent
@@ -69,23 +78,45 @@ func (mq *MessageQueue) ListenMessages() {
 			fmt.Println("NOTIF: There are 0 connections")
 			continue
 		}
+
+		if len(mq.Queue) < 1 {
+			fmt.Println("NOTIF: There are 0 messages in queue")
+			continue
+		}
+
 		fmt.Println("NOTIF: Sending messages...")
 		fmt.Printf("NOTIF: Total messages to be sent %d\n", len(mq.Queue))
+
 		for range mq.Queue {
+			// TODO ADD MUTEX LOCK IF RACE CONDITION OCCURS
 			message := mq.Queue.Dequeue()
-			for _, c := range mq.Connections {
-				go func() {
-					_, err := c.Write(message)
-					if err != nil {
-						fmt.Println(err.Error())
-						fmt.Println("ERROR: Unable to write to consumer")
-						return
-					}
-					fmt.Printf("NOTIF: Message sent for route %s: %+v\n", mq.Name, message[:4])
-				}()
+			for _, connID := range mq.ConnectionIDs {
+				conn, exists := mq.Connections[connID]
+				if !exists {
+					fmt.Println("ERROR: Connection does not exist, please remove it")
+					return
+				}
+				go sendMessage(conn, message, disconnectedClients) // might cause race condition
+				fmt.Printf("NOTIF: Message sent for route %s: %+v\n", mq.Name, message[:4])
 			}
 		}
+		for _, deadConnID := range disconnectedClients {
+			delete(mq.Connections, deadConnID)
+		}
 		fmt.Println("NOTIF: Messages sent")
+		mq.Log()
+	}
+}
+
+func sendMessage(c *ConsumerConnection, message []byte, disconnectedClients []string) {
+	_, err := c.Conn.Write(message)
+	if err != nil {
+		fmt.Println("ERROR: Unable to write to consumer")
+		if errors.Is(err, net.ErrClosed) {
+			fmt.Println(err.Error())
+			disconnectedClients = append(disconnectedClients, c.ConnectionID)
+		}
+		return
 	}
 }
 

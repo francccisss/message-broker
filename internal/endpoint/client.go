@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
 	"message-broker/internal/message_queue"
 	msgType "message-broker/internal/types"
 	"message-broker/internal/utils"
@@ -71,7 +72,11 @@ func (ep Endpoint) handleConsumers(msg msgType.Consumer) {
 		fmt.Printf("ERROR: Message queue does not exist with specified route: %s\n", msg.Route)
 		return
 	}
-	msq.Connections = append(msq.Connections, ep.Conn)
+	newConnectionID := uuid.NewString()
+	msq.Connections[newConnectionID] = &mq.ConsumerConnection{
+		Conn:         ep.Conn,
+		ConnectionID: newConnectionID,
+	}
 	fmt.Printf("NOTIF: Register consumer in route: %s\n", msq.Name)
 	msq.Log()
 	msq.Notif <- struct{}{}
@@ -90,22 +95,25 @@ func (ep Endpoint) handleQueueAssert(q msgType.Queue) {
 	fmt.Println("NOTIF: Queue Message received")
 	table := mq.GetMessageQueueTable()
 	_, exists := table[q.Name]
+	var m sync.Mutex
 	if !exists {
 		newMq :=
 			&mq.MessageQueue{
-				Type:        q.Type,
-				Name:        q.Name,
-				Durable:     q.Durable,
-				Connections: []net.Conn{},
-				Notif:       make(chan struct{}),
-				Queue:       queue.Queue{},
+				Type:          q.Type,
+				Name:          q.Name,
+				Durable:       q.Durable,
+				Connections:   map[string]*mq.ConsumerConnection{},
+				ConnectionIDs: []string{},
+				Notif:         make(chan struct{}),
+				Queue:         queue.Queue{},
+				M:             &m,
 			}
 		table[q.Name] = newMq
-		fmt.Printf("NOTIF: MESSAGE QUEUE CREATED: %s\n", q.Name)
+		fmt.Printf("NOTIF: New Message queue created: %s\n", q.Name)
 		go newMq.ListenMessages()
 		return
 	}
-	fmt.Printf("NOTIF: MESSAGE QUEUE ALREADY EXISTS: %s\n", q.Name)
+	fmt.Printf("NOTIF: Message queue already exists: %s\n", q.Name)
 }
 
 /*

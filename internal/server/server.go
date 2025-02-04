@@ -51,8 +51,12 @@ func (s *Server) ListenConnections() {
 
 /*
 Logic body for handling different message types and distributing to different performers
+
   - Endpoint messages will be handled by 'HandleEPMessage()'
+
   - Queue assertion will be handled by 'HandleQueueAssert()'
+
+    TODO remove consumer connection in the message queue if they are disconnected
 */
 func HandleIncomingRequests(c net.Conn) {
 	var mux sync.Mutex
