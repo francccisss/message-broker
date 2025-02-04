@@ -7,10 +7,10 @@ import (
 )
 
 func TestQueue(t *testing.T) {
-	q := queue.Queue{}
-	value, err := q.Dequeue()
-	fmt.Println(value)
-	if value == nil {
-		t.Fatal(err.Error())
-	}
+	var q queue.Queue
+	q.Enqueue([]byte("1"))
+	q.Enqueue([]byte("2"))
+	q.Enqueue([]byte("3"))
+	fmt.Println(q.Dequeue())
+	fmt.Println(q.GetItems())
 }
