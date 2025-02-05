@@ -72,12 +72,14 @@ func (ep Endpoint) handleConsumers(msg msgType.Consumer) {
 		fmt.Printf("ERROR: Message queue does not exist with specified route: %s\n", msg.Route)
 		return
 	}
+	msq.M.Lock()
 	newConnectionID := uuid.NewString()
 	msq.Connections[newConnectionID] = &mq.ConsumerConnection{
 		Conn:         ep.Conn,
 		ConnectionID: newConnectionID,
 	}
 	msq.ConnectionIDs = append(msq.ConnectionIDs, newConnectionID)
+	msq.M.Unlock()
 	fmt.Printf("NOTIF: Register consumer in route: %s\n", msq.Name)
 	msq.Log()
 	msq.Notif <- struct{}{}
@@ -132,6 +134,7 @@ func (ep Endpoint) handleEPMessage(msg msgType.EPMessage) error {
 		return fmt.Errorf("ERROR: A message for route: %s does not exist, either specify an existing route or create one using `AssertQueue`", msg.Route)
 	}
 
+	msq.M.Lock()
 	m, err := json.Marshal(msg)
 	if err != nil {
 		return fmt.Errorf("ERROR: Unable to marshal client message for delivery")
@@ -141,6 +144,7 @@ func (ep Endpoint) handleEPMessage(msg msgType.EPMessage) error {
 		return err
 	}
 	msq.Queue.Enqueue(appendedMsg)
+	msq.M.Unlock()
 	fmt.Println("NOTIF: New message in queue")
 	msq.Log()
 	msq.Notif <- struct{}{}

@@ -65,7 +65,7 @@ func (mq *MessageQueue) ListenMessages() {
 
 	for range mq.Notif {
 		// Handling disconnected clients
-		disconnectedClients := []string{}
+		disconnectedClients := map[string]string{}
 
 		// Listener is notified when there are new consumers, and or there are new messages
 		// when message queue was full wit messages, and connections are present
@@ -106,20 +106,42 @@ func (mq *MessageQueue) ListenMessages() {
 		fmt.Println("TEST_NOTIF: All messages has been sent")
 		mq.Log()
 
-		// // TODO Update ConnectionIDs[] removing dead connections
-		// for _, deadConnID := range disconnectedClients {
-		// 	delete(mq.Connections, deadConnID)
-		// }
 	}
 }
 
-func sendMessage(c *ConsumerConnection, message []byte, disconnectedClients []string) {
+// for each connectionID in connectionIDs
+// if connectionID is a dead connection
+// move every element in connectionIDs from dead connection's index position + 1 to dead connection's index position
+// [1,2,3, dead, <- 5, 6, 7, dead, <- 9]
+func (mq *MessageQueue) removeDeadConnections(deadConnections map[string]string) {
+	newConnectionIDsSlice := make([]string, len(mq.ConnectionIDs))
+	numOfDead := 0
+	for i, connectionID := range mq.ConnectionIDs {
+		_, isDead := deadConnections[connectionID]
+		if isDead {
+			// append the before and after dead connection slices
+			// dead connection at ith index position
+			// extract elements before ith and after ith position
+			fmt.Printf("TEST_NOTIF: Removing dead connection id: %s\n", connectionID)
+			fmt.Println("TEST_NOTIF: Removing dead connection net.Conn ^^^")
+			newConnectionIDsSlice = append(mq.ConnectionIDs[:i-1], mq.ConnectionIDs[i+1:]...)
+			delete(mq.Connections, connectionID) // Removes dead net.Conn from mq.Connections
+			numOfDead++
+		}
+	}
+	mq.ConnectionIDs = newConnectionIDsSlice[:]
+	fmt.Printf("TEST_NOTIF: Number of dead connections removed: %d\n", numOfDead)
+	fmt.Printf("TEST_NOTIF: Connection IDs remaining: %d\n", len(mq.ConnectionIDs))
+	fmt.Printf("TEST_NOTIF: Connection remaining: %d\n", len(mq.Connections))
+}
+
+func sendMessage(c *ConsumerConnection, message []byte, disconnectedClients map[string]string) {
 	_, err := c.Conn.Write(message)
 	if err != nil {
 		fmt.Println("ERROR: Unable to write to consumer")
 		if errors.Is(err, net.ErrClosed) {
 			fmt.Println(err.Error())
-			disconnectedClients = append(disconnectedClients, c.ConnectionID)
+			disconnectedClients[c.ConnectionID] = c.ConnectionID
 		}
 		return
 	}
