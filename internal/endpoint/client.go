@@ -33,6 +33,7 @@ type EPHandler interface {
 }
 
 func (ep Endpoint) MessageHandler(msgBuf bytes.Buffer) {
+	// utils.MessageParser(msgBuf.Bytes())
 	endpointMsg, err := utils.MessageParser(msgBuf.Bytes())
 	// ERROR Handling
 	if err != nil {
@@ -41,8 +42,7 @@ func (ep Endpoint) MessageHandler(msgBuf bytes.Buffer) {
 		return
 	}
 
-	// type assertion switch statement for different processing
-
+	// // type assertion switch statement for different processing
 	switch msg := endpointMsg.(type) {
 	case msgType.Consumer:
 		ep.Mux.Lock()
@@ -77,6 +77,7 @@ func (ep Endpoint) handleConsumers(msg msgType.Consumer) {
 		Conn:         ep.Conn,
 		ConnectionID: newConnectionID,
 	}
+	msq.ConnectionIDs = append(msq.ConnectionIDs, newConnectionID)
 	fmt.Printf("NOTIF: Register consumer in route: %s\n", msq.Name)
 	msq.Log()
 	msq.Notif <- struct{}{}

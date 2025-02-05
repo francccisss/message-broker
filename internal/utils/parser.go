@@ -23,6 +23,7 @@ func MessageParser(b []byte) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
+		fmt.Printf("NOTIF: Received %s\n", epMsg.MessageType)
 		return epMsg, nil
 	case "Consumer":
 		var cons msgType.Consumer
@@ -30,6 +31,7 @@ func MessageParser(b []byte) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
+		fmt.Printf("NOTIF: Received %s\n", cons.MessageType)
 		return cons, nil
 	case "Queue":
 		var q msgType.Queue
@@ -37,6 +39,7 @@ func MessageParser(b []byte) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
+		fmt.Printf("NOTIF: Received %s\n", q.MessageType)
 		return q, nil
 	default:
 		return temp, fmt.Errorf("ERROR: Not of any known message type")

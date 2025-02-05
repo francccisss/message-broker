@@ -83,28 +83,33 @@ func (mq *MessageQueue) ListenMessages() {
 			fmt.Println("NOTIF: There are 0 messages in queue")
 			continue
 		}
-
-		fmt.Println("NOTIF: Sending messages...")
 		fmt.Printf("NOTIF: Total messages to be sent %d\n", len(mq.Queue))
 
-		for range mq.Queue {
+		fmt.Printf("NOTIF: Sending all %d messages\n", len(mq.Queue))
+		for i := range mq.Queue {
 			// TODO ADD MUTEX LOCK IF RACE CONDITION OCCURS
 			message := mq.Queue.Dequeue()
+
+			// TODO This does not work btw
 			for _, connID := range mq.ConnectionIDs {
 				conn, exists := mq.Connections[connID]
+				fmt.Printf("TEST_NOTIF: Sending Message #%d\n", i)
+				go sendMessage(conn, message, disconnectedClients) // might cause race condition
+				fmt.Printf("TEST_NOTIF: Message sent for route %s: %+v\n", mq.Name, message[:4])
+
 				if !exists {
 					fmt.Println("ERROR: Connection does not exist, please remove it")
 					return
 				}
-				go sendMessage(conn, message, disconnectedClients) // might cause race condition
-				fmt.Printf("NOTIF: Message sent for route %s: %+v\n", mq.Name, message[:4])
 			}
 		}
-		for _, deadConnID := range disconnectedClients {
-			delete(mq.Connections, deadConnID)
-		}
-		fmt.Println("NOTIF: Messages sent")
+		fmt.Println("TEST_NOTIF: All messages has been sent")
 		mq.Log()
+
+		// // TODO Update ConnectionIDs[] removing dead connections
+		// for _, deadConnID := range disconnectedClients {
+		// 	delete(mq.Connections, deadConnID)
+		// }
 	}
 }
 
@@ -118,6 +123,7 @@ func sendMessage(c *ConsumerConnection, message []byte, disconnectedClients []st
 		}
 		return
 	}
+	fmt.Println("TEST_NOTIF: Message sent")
 }
 
 func (mq *MessageQueue) Log() {

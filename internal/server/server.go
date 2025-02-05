@@ -87,8 +87,6 @@ func HandleIncomingRequests(c net.Conn) {
 		// else if current readSize is greater than the remaining bytes left from the expected message
 		// return n bytes up to the length of the remaining bytes of the current message.
 		currentReadSize := int(math.Min(float64(expectedMsgLength-msgBuf.Len()), float64(DEFAULT_READ_SIZE)))
-
-		fmt.Printf("NOTIF: Prefix Length Receieved: %d\n", expectedMsgLength)
 		for {
 
 			// creates a buffer up to the calculated readSize
@@ -116,7 +114,6 @@ func HandleIncomingRequests(c net.Conn) {
 			// finishes the current stream request
 			if msgBuf.Len() == expectedMsgLength {
 				go ep.MessageHandler(msgBuf)
-				fmt.Println("NOTIF: Message sequence complete.")
 				break
 			}
 		}
