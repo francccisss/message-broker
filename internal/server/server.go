@@ -2,7 +2,6 @@ package server
 
 import (
 	"bytes"
-	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -10,8 +9,6 @@ import (
 	client "message-broker/internal/endpoint"
 	"net"
 	"sync"
-
-	"golang.org/x/sync/semaphore"
 )
 
 const (
@@ -61,10 +58,8 @@ Logic body for handling different message types and distributing to different pe
 */
 func HandleIncomingRequests(c net.Conn) {
 	var mux sync.Mutex
-	sem := semaphore.NewWeighted(1)
-	var ctx context.Context
 
-	ep := client.Endpoint{Mux: &mux, Conn: c, Sem: sem, Ctx: ctx}
+	ep := client.Endpoint{Mux: &mux, Conn: c}
 	defer c.Close()
 
 	// fixed sized header length to extract from message stream

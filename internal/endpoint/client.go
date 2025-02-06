@@ -2,7 +2,6 @@ package client
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"message-broker/internal/message_queue"
@@ -13,7 +12,6 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	"golang.org/x/sync/semaphore"
 )
 
 /*
@@ -24,8 +22,6 @@ The Interface is used to handle different message types which is defined in the
 message's Header `Type` property
 */
 type Endpoint struct {
-	Ctx                   context.Context
-	Sem                   *semaphore.Weighted
 	Mux                   *sync.Mutex
 	Conn                  net.Conn
 	IncomingConsumerQueue queue.Queue
@@ -52,17 +48,13 @@ func (ep Endpoint) MessageHandler(msgBuf bytes.Buffer) {
 	switch msg := endpointMsg.(type) {
 
 	case msgType.Queue:
-		ep.Mux.Lock()
 		ep.handleQueueAssert(msg)
-		ep.Mux.Unlock()
 	case msgType.Consumer:
-		ep.Mux.Lock()
 		ep.handleConsumers(msg)
-		ep.Mux.Unlock()
 	case msgType.EPMessage:
-		ep.Mux.Lock()
+		// Signals ep message handler to store new message once
+		// a queue has been created
 		ep.handleEPMessage(msg)
-		ep.Mux.Unlock()
 	default:
 		fmt.Println("ERROR: Unidentified type")
 		// ep.Conn.Write([]byte("ERROR: Unidentified type: Types should consist of EPMessage | Queue "))
@@ -74,24 +66,20 @@ func (ep Endpoint) MessageHandler(msgBuf bytes.Buffer) {
 // TODO Fix Consumer message is received before a message queue could be created
 // need to make sure that a message queue should first be created before assigning
 // a consumer to a message queue
+// or instead of registering a consumer within the server using Consume(), we could just include
+// the register with queue assertion since queue asssertion already needs to be
+// defined with a route along with the the StreamID from a channel, on the client side when calling consume
+// we could register that separately and the mudem would still work
+// Sol#2 Create a queue of consumer message and EPMessage's
 
 func (ep *Endpoint) handleConsumers(msg msgType.Consumer) {
 	fmt.Println("NOTIF: Consumer Message received")
-	messageQueueTable := mq.GetMessageQueueTable()
-	msq, exists := messageQueueTable[msg.Route]
-	if !exists {
-		fmt.Printf("ERROR: Message queue does not exist with specified route: %s\n", msg.Route)
-		return
-	}
-	newConnectionID := uuid.NewString()
-	msq.Connections[newConnectionID] = &mq.ConsumerConnection{
-		Conn:         ep.Conn,
-		ConnectionID: newConnectionID,
-	}
-	msq.ConnectionIDs = append(msq.ConnectionIDs, newConnectionID)
-	fmt.Printf("NOTIF: Register consumer in route: %s\n", msq.Name)
-	msq.Log()
-	msq.Notif <- struct{}{}
+	// messageQueueTable := mq.GetMessageQueueTable()
+	// msq, exists := messageQueueTable[msg.Route]
+	// if !exists {
+	// 	fmt.Printf("ERROR: Message queue does not exist with specified route: %s\n", msg.Route)
+	// 	return
+	// }
 }
 
 /*
@@ -103,29 +91,59 @@ When a route is matched within the RouteTable a type of Route will be accessible
     each item in the queue messages
   - an error is thrown if no route matched with the message Route
 */
-func (ep Endpoint) handleQueueAssert(q msgType.Queue) {
-	fmt.Println("NOTIF: Queue Message received")
+func (ep Endpoint) handleQueueAssert(msg msgType.Queue) {
+	fmt.Printf("NOTIF: Creating Queue \"%s\" \n", msg.Name)
+	newConnectionID := uuid.NewString()
 	table := mq.GetMessageQueueTable()
-	_, exists := table[q.Name]
-	var m sync.Mutex
-	if !exists {
-		newMq :=
-			&mq.MessageQueue{
-				Type:          q.Type,
-				Name:          q.Name,
-				Durable:       q.Durable,
-				Connections:   map[string]*mq.ConsumerConnection{},
-				ConnectionIDs: []string{},
-				Notif:         make(chan struct{}),
-				Queue:         queue.Queue{},
-				M:             &m,
-			}
-		table[q.Name] = newMq
-		fmt.Printf("NOTIF: New Message queue created: %s\n", q.Name)
-		go newMq.ListenMessages()
+	msq, exists := table[msg.Name]
+
+	if exists {
+		// Just register connection to route
+		fmt.Printf("NOTIF: Message queue exists: %s\n", msg.Name)
+		fmt.Println("NOTIF: Registering client connection to route...")
+		msq.Connections[newConnectionID] = &mq.ConsumerConnection{
+			Conn:         ep.Conn,
+			ConnectionID: newConnectionID,
+		}
+		msq.ConnectionIDs = append(msq.ConnectionIDs, newConnectionID)
+		fmt.Printf("NOTIF: Connection successfully registerd to route \"%s\"\n", msg.Name)
+		msq.Log()
+		msq.Notif <- struct{}{}
 		return
 	}
-	fmt.Printf("NOTIF: Message queue already exists: %s\n", q.Name)
+	fmt.Printf("NOTIF: Creating a new Message Queue: %s\n", msg.Name)
+	var m sync.Mutex
+	newMq :=
+		&mq.MessageQueue{
+			Type:          msg.Type,
+			Name:          msg.Name,
+			Durable:       msg.Durable,
+			Connections:   map[string]*mq.ConsumerConnection{},
+			ConnectionIDs: []string{},
+			Notif:         make(chan struct{}),
+			Queue:         queue.Queue{},
+			M:             &m,
+		}
+	table[msg.Name] = newMq
+	fmt.Printf("NOTIF: New Message queue created: %s\n", msg.Name)
+	go newMq.ListenMessages()
+	// insert new connection to the route
+	// Might optimize this by storing client connectios separately
+	// and create an array of routes a connection is listening to
+	// and when a message is to be sent to clients then we could
+	// just look at each connections []route field and check
+	// if the connection matches the route the message is to be sent to
+	// then send it to that route
+
+	fmt.Println("NOTIF: Registering client connection to route...")
+	newMq.Connections[newConnectionID] = &mq.ConsumerConnection{
+		Conn:         ep.Conn,
+		ConnectionID: newConnectionID,
+	}
+	newMq.ConnectionIDs = append(newMq.ConnectionIDs, newConnectionID)
+	fmt.Printf("NOTIF: Connection successfully registerd to route \"%s\"\n", msg.Name)
+	newMq.Log()
+	newMq.Notif <- struct{}{}
 }
 
 /*
