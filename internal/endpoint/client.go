@@ -2,15 +2,18 @@ package client
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
 	"message-broker/internal/message_queue"
 	msgType "message-broker/internal/types"
 	"message-broker/internal/utils"
 	"message-broker/internal/utils/queue"
 	"net"
 	"sync"
+
+	"github.com/google/uuid"
+	"golang.org/x/sync/semaphore"
 )
 
 /*
@@ -21,8 +24,11 @@ The Interface is used to handle different message types which is defined in the
 message's Header `Type` property
 */
 type Endpoint struct {
-	Mux  *sync.Mutex
-	Conn net.Conn
+	Ctx                   context.Context
+	Sem                   *semaphore.Weighted
+	Mux                   *sync.Mutex
+	Conn                  net.Conn
+	IncomingConsumerQueue queue.Queue
 }
 
 type EPHandler interface {
@@ -44,6 +50,11 @@ func (ep Endpoint) MessageHandler(msgBuf bytes.Buffer) {
 
 	// // type assertion switch statement for different processing
 	switch msg := endpointMsg.(type) {
+
+	case msgType.Queue:
+		ep.Mux.Lock()
+		ep.handleQueueAssert(msg)
+		ep.Mux.Unlock()
 	case msgType.Consumer:
 		ep.Mux.Lock()
 		ep.handleConsumers(msg)
@@ -51,10 +62,6 @@ func (ep Endpoint) MessageHandler(msgBuf bytes.Buffer) {
 	case msgType.EPMessage:
 		ep.Mux.Lock()
 		ep.handleEPMessage(msg)
-		ep.Mux.Unlock()
-	case msgType.Queue:
-		ep.Mux.Lock()
-		ep.handleQueueAssert(msg)
 		ep.Mux.Unlock()
 	default:
 		fmt.Println("ERROR: Unidentified type")
@@ -64,7 +71,11 @@ func (ep Endpoint) MessageHandler(msgBuf bytes.Buffer) {
 
 }
 
-func (ep Endpoint) handleConsumers(msg msgType.Consumer) {
+// TODO Fix Consumer message is received before a message queue could be created
+// need to make sure that a message queue should first be created before assigning
+// a consumer to a message queue
+
+func (ep *Endpoint) handleConsumers(msg msgType.Consumer) {
 	fmt.Println("NOTIF: Consumer Message received")
 	messageQueueTable := mq.GetMessageQueueTable()
 	msq, exists := messageQueueTable[msg.Route]
@@ -72,14 +83,12 @@ func (ep Endpoint) handleConsumers(msg msgType.Consumer) {
 		fmt.Printf("ERROR: Message queue does not exist with specified route: %s\n", msg.Route)
 		return
 	}
-	msq.M.Lock()
 	newConnectionID := uuid.NewString()
 	msq.Connections[newConnectionID] = &mq.ConsumerConnection{
 		Conn:         ep.Conn,
 		ConnectionID: newConnectionID,
 	}
 	msq.ConnectionIDs = append(msq.ConnectionIDs, newConnectionID)
-	msq.M.Unlock()
 	fmt.Printf("NOTIF: Register consumer in route: %s\n", msq.Name)
 	msq.Log()
 	msq.Notif <- struct{}{}

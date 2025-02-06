@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -9,6 +10,8 @@ import (
 	client "message-broker/internal/endpoint"
 	"net"
 	"sync"
+
+	"golang.org/x/sync/semaphore"
 )
 
 const (
@@ -53,15 +56,15 @@ func (s *Server) ListenConnections() {
 Logic body for handling different message types and distributing to different performers
 
   - Endpoint messages will be handled by 'HandleEPMessage()'
-
   - Queue assertion will be handled by 'HandleQueueAssert()'
-
     TODO remove consumer connection in the message queue if they are disconnected
 */
 func HandleIncomingRequests(c net.Conn) {
 	var mux sync.Mutex
+	sem := semaphore.NewWeighted(1)
+	var ctx context.Context
 
-	ep := client.Endpoint{Mux: &mux, Conn: c}
+	ep := client.Endpoint{Mux: &mux, Conn: c, Sem: sem, Ctx: ctx}
 	defer c.Close()
 
 	// fixed sized header length to extract from message stream

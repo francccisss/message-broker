@@ -62,6 +62,7 @@ When there are no connections message stays in the queue
 func (mq *MessageQueue) ListenMessages() {
 	fmt.Println("NOTIF: New Listener spawned")
 	mq.Log()
+	var wg sync.WaitGroup
 
 	for range mq.Notif {
 		// Handling disconnected clients
@@ -87,15 +88,15 @@ func (mq *MessageQueue) ListenMessages() {
 
 		fmt.Printf("NOTIF: Sending all %d messages\n", len(mq.Queue))
 		for i := range mq.Queue {
-			// TODO ADD MUTEX LOCK IF RACE CONDITION OCCURS
 			message := mq.Queue.Dequeue()
 
-			// TODO This does not work btw
+			// This is the only way for now to remove dead connections
 			for _, connID := range mq.ConnectionIDs {
+				wg.Add(1)
 				conn, exists := mq.Connections[connID]
 				fmt.Printf("TEST_NOTIF: Sending Message #%d\n", i)
-				go sendMessage(conn, message, disconnectedClients) // might cause race condition
-				fmt.Printf("TEST_NOTIF: Message sent for route %s: %+v\n", mq.Name, message[:4])
+				go sendMessage(&wg, conn, message.([]byte), disconnectedClients) // might cause race condition
+				fmt.Printf("TEST_NOTIF: Message sent for route %s: %+v\n", mq.Name, message.([]byte)[:4])
 
 				if !exists {
 					fmt.Println("ERROR: Connection does not exist, please remove it")
@@ -103,10 +104,37 @@ func (mq *MessageQueue) ListenMessages() {
 				}
 			}
 		}
+		fmt.Println("TEST_NOTIF: Barrier Waiting for all messages to be sent by go routines...")
+		wg.Wait()
 		fmt.Println("TEST_NOTIF: All messages has been sent")
+		mq.removeDeadConnections(disconnectedClients)
 		mq.Log()
-
 	}
+}
+
+// TODO Need to be able to remove consumers from message queue if they are disconnected
+func sendMessage(wg *sync.WaitGroup, c *ConsumerConnection, message []byte, disconnectedClients map[string]string) {
+	defer wg.Done()
+	_, err := c.Conn.Write(message)
+	if err != nil {
+		fmt.Println("ERROR: Unable to write to consumer")
+		if errors.Is(err, net.ErrClosed) {
+
+			// Error returns "use of closed network connection"
+			// if connection was closed but wanting to write to it
+
+			fmt.Println(err.Error())
+			// Add disconnected clients into the map for clean up
+			fmt.Printf("TEST_NOTIF: Connection dead: %s", c.ConnectionID)
+			disconnectedClients[c.ConnectionID] = c.ConnectionID
+		}
+		return
+	}
+	fmt.Println("TEST_NOTIF: Message sent")
+}
+
+func (mq *MessageQueue) Log() {
+	fmt.Printf("Messsage Queue Stats: \n |-Route: %s, \n |-Connections: %d, \n |-Pending Messages in Queue: %d\n", mq.Name, len(mq.Connections), len(mq.Queue))
 }
 
 // for each connectionID in connectionIDs
@@ -124,7 +152,15 @@ func (mq *MessageQueue) removeDeadConnections(deadConnections map[string]string)
 			// extract elements before ith and after ith position
 			fmt.Printf("TEST_NOTIF: Removing dead connection id: %s\n", connectionID)
 			fmt.Println("TEST_NOTIF: Removing dead connection net.Conn ^^^")
-			newConnectionIDsSlice = append(mq.ConnectionIDs[:i-1], mq.ConnectionIDs[i+1:]...)
+
+			// Fix this out of bounds when `i` is first element (0-1 ) -> [:-1]
+			// if i == 0 return 0
+
+			before := mq.ConnectionIDs[:0]
+			if i > 0 {
+				before = mq.ConnectionIDs[:i-1]
+			}
+			newConnectionIDsSlice = append(before, mq.ConnectionIDs[i+1:]...)
 			delete(mq.Connections, connectionID) // Removes dead net.Conn from mq.Connections
 			numOfDead++
 		}
@@ -133,21 +169,5 @@ func (mq *MessageQueue) removeDeadConnections(deadConnections map[string]string)
 	fmt.Printf("TEST_NOTIF: Number of dead connections removed: %d\n", numOfDead)
 	fmt.Printf("TEST_NOTIF: Connection IDs remaining: %d\n", len(mq.ConnectionIDs))
 	fmt.Printf("TEST_NOTIF: Connection remaining: %d\n", len(mq.Connections))
-}
-
-func sendMessage(c *ConsumerConnection, message []byte, disconnectedClients map[string]string) {
-	_, err := c.Conn.Write(message)
-	if err != nil {
-		fmt.Println("ERROR: Unable to write to consumer")
-		if errors.Is(err, net.ErrClosed) {
-			fmt.Println(err.Error())
-			disconnectedClients[c.ConnectionID] = c.ConnectionID
-		}
-		return
-	}
-	fmt.Println("TEST_NOTIF: Message sent")
-}
-
-func (mq *MessageQueue) Log() {
-	fmt.Printf("Messsage Queue Stats: \n |-Route: %s, \n |-Connections: %d, \n |-Pending Messages in Queue: %d\n", mq.Name, len(mq.Connections), len(mq.Queue))
+	mq.Log()
 }
