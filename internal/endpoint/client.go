@@ -48,13 +48,19 @@ func (ep Endpoint) MessageHandler(msgBuf bytes.Buffer) {
 	switch msg := endpointMsg.(type) {
 
 	case msgType.Queue:
+		ep.Mux.Lock()
 		ep.handleQueueAssert(msg)
+		ep.Mux.Unlock()
 	case msgType.Consumer:
+		ep.Mux.Lock()
 		ep.handleConsumers(msg)
+		ep.Mux.Unlock()
 	case msgType.EPMessage:
+		ep.Mux.Lock()
 		// Signals ep message handler to store new message once
 		// a queue has been created
 		ep.handleEPMessage(msg)
+		ep.Mux.Unlock()
 	default:
 		fmt.Println("ERROR: Unidentified type")
 		// ep.Conn.Write([]byte("ERROR: Unidentified type: Types should consist of EPMessage | Queue "))
