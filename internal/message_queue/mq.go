@@ -97,10 +97,13 @@ func (mq *MessageQueue) ListenMessages() {
 				fmt.Printf("TEST_NOTIF: Sending Message #%d\n", i)
 				go sendMessage(&wg, conn, message.([]byte), disconnectedClients) // might cause race condition
 				fmt.Printf("TEST_NOTIF: Message sent for route %s: %+v\n", mq.Name, message.([]byte)[:4])
-
+				// if for some reason a dead connection exists when it shouldn't
+				// add it to disconnected clients for removal after sending messages
 				if !exists {
 					fmt.Println("ERROR: Connection does not exist, please remove it")
-					return
+					fmt.Println("TEST_ERROR: Appending connectionID to disconnected clients array")
+					disconnectedClients[connID] = connID
+					continue
 				}
 			}
 		}
@@ -133,15 +136,12 @@ func sendMessage(wg *sync.WaitGroup, c *ConsumerConnection, message []byte, disc
 	fmt.Println("TEST_NOTIF: Message sent")
 }
 
-func (mq *MessageQueue) Log() {
-	fmt.Printf("Messsage Queue Stats: \n |-Route: %s, \n |-Connections: %d, \n |-Pending Messages in Queue: %d\n", mq.Name, len(mq.Connections), len(mq.Queue))
-}
-
 // for each connectionID in connectionIDs
 // if connectionID is a dead connection
 // move every element in connectionIDs from dead connection's index position + 1 to dead connection's index position
 // [1,2,3, dead, <- 5, 6, 7, dead, <- 9]
 func (mq *MessageQueue) removeDeadConnections(deadConnections map[string]string) {
+	fmt.Println("TEST_NOTIF: Cleaning up dead connection...")
 	newConnectionIDsSlice := make([]string, len(mq.ConnectionIDs))
 	numOfDead := 0
 	for i, connectionID := range mq.ConnectionIDs {
@@ -165,9 +165,17 @@ func (mq *MessageQueue) removeDeadConnections(deadConnections map[string]string)
 			numOfDead++
 		}
 	}
-	mq.ConnectionIDs = newConnectionIDsSlice[:]
+	// BRUH ITS REMOVING EVEN THOUGH THERE ARE NO DEAD CONNECTIONS AAA
+	// Making sure that only when there are dead connections only then will we
+	// replace all of the connectionIDs
+	if len(deadConnections) > 0 {
+		mq.ConnectionIDs = newConnectionIDsSlice[:]
+	}
 	fmt.Printf("TEST_NOTIF: Number of dead connections removed: %d\n", numOfDead)
 	fmt.Printf("TEST_NOTIF: Connection IDs remaining: %d\n", len(mq.ConnectionIDs))
-	fmt.Printf("TEST_NOTIF: Connection remaining: %d\n", len(mq.Connections))
-	mq.Log()
+	fmt.Printf("TEST_NOTIF: Connections remaining: %d\n", len(mq.Connections))
+}
+
+func (mq *MessageQueue) Log() {
+	fmt.Printf("Messsage Queue Stats: \n |-Route: %s, \n |-Connections: %d, \n |-Pending Messages in Queue: %d\n", mq.Name, len(mq.Connections), len(mq.Queue))
 }
