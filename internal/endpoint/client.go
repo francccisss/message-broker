@@ -2,7 +2,6 @@ package client
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"message-broker/internal/message_queue"
 	msgType "message-broker/internal/types"
@@ -110,6 +109,7 @@ func (ep Endpoint) handleQueueAssert(msg msgType.Queue) {
 		msq.Connections[newConnectionID] = &mq.ConsumerConnection{
 			Conn:         ep.Conn,
 			ConnectionID: newConnectionID,
+			StreamID:     msg.StreamID,
 		}
 		msq.ConnectionIDs = append(msq.ConnectionIDs, newConnectionID)
 		fmt.Printf("NOTIF: Connection successfully registerd to route \"%s\"\n", msg.Name)
@@ -147,6 +147,7 @@ func (ep Endpoint) handleQueueAssert(msg msgType.Queue) {
 	newMq.Connections[newConnectionID] = &mq.ConsumerConnection{
 		Conn:         ep.Conn,
 		ConnectionID: newConnectionID,
+		StreamID:     msg.StreamID,
 	}
 	newMq.ConnectionIDs = append(newMq.ConnectionIDs, newConnectionID)
 	fmt.Printf("NOTIF: Connection successfully registerd to route \"%s\"\n", msg.Name)
@@ -170,15 +171,7 @@ func (ep Endpoint) handleEPMessage(msg msgType.EPMessage) error {
 	}
 
 	msq.M.Lock()
-	m, err := json.Marshal(msg)
-	if err != nil {
-		return fmt.Errorf("ERROR: Unable to marshal client message for delivery")
-	}
-	appendedMsg, err := utils.AppendPrefixLength(m)
-	if err != nil {
-		return err
-	}
-	msq.Queue.Enqueue(appendedMsg)
+	msq.Queue.Enqueue(msg)
 	msq.M.Unlock()
 	fmt.Println("NOTIF: New message in queue")
 	msq.Log()

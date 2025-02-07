@@ -1,8 +1,11 @@
 package mq
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"message-broker/internal/types"
+	"message-broker/internal/utils"
 	"message-broker/internal/utils/queue"
 	"net"
 	"sync"
@@ -32,6 +35,7 @@ type MessageQueue struct {
 type ConsumerConnection struct {
 	Conn         net.Conn
 	ConnectionID string
+	StreamID     string
 }
 
 var table = map[string]*MessageQueue{}
@@ -95,7 +99,6 @@ func (mq *MessageQueue) ListenMessages() {
 				wg.Add(1)
 				conn, exists := mq.Connections[connID]
 				fmt.Printf("TEST_NOTIF: Sending Message #%d\n", i)
-				fmt.Printf("TEST_NOTIF: Message sent for route %s: %+v\n", mq.Name, message.([]byte)[:4])
 				// if for some reason a dead connection exists when it shouldn't
 				// add it to disconnected clients for removal after sending messages
 				if !exists {
@@ -104,7 +107,7 @@ func (mq *MessageQueue) ListenMessages() {
 					mq.removeDeadConnection(connID)
 					continue
 				}
-				go mq.sendMessage(&wg, conn, message.([]byte)) // might cause race condition
+				go mq.sendMessage(&wg, conn, message.(types.EPMessage)) // might cause race condition
 			}
 		}
 		fmt.Println("TEST_NOTIF: Barrier Waiting for all messages to be sent by go routines...")
@@ -115,9 +118,24 @@ func (mq *MessageQueue) ListenMessages() {
 }
 
 // TODO Need to be able to remove consumers from message queue if they are disconnected
-func (mq *MessageQueue) sendMessage(wg *sync.WaitGroup, c *ConsumerConnection, message []byte) {
+func (mq *MessageQueue) sendMessage(wg *sync.WaitGroup, c *ConsumerConnection, message types.EPMessage) {
 	defer wg.Done()
-	_, err := c.Conn.Write(message)
+
+	message.StreamID = c.StreamID
+	fmt.Println(c.StreamID)
+	fmt.Println(message.StreamID)
+	m, err := json.Marshal(message)
+	if err != nil {
+		fmt.Println("ERROR: Unable to marshal client message for delivery")
+		return
+	}
+
+	appendedMsg, err := utils.AppendPrefixLength(m)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	_, err = c.Conn.Write(appendedMsg)
 	if err != nil {
 		fmt.Println("ERROR: Unable to write to consumer")
 		if errors.Is(err, net.ErrClosed) {
@@ -131,7 +149,7 @@ func (mq *MessageQueue) sendMessage(wg *sync.WaitGroup, c *ConsumerConnection, m
 		}
 		return
 	}
-	fmt.Println("TEST_NOTIF: Message sent")
+	fmt.Printf("TEST_NOTIF: Message sent for route %s:\n|-StreamID %s\n|-MsgLen %d\n", mq.Name, message.StreamID, len(message.Body))
 }
 
 // for each connectionID in connectionIDs
