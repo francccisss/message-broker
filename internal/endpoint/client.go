@@ -117,18 +117,20 @@ func (ep Endpoint) handleQueueAssert(msg msgType.Queue) {
 		msq.Notif <- struct{}{}
 		return
 	}
+
 	fmt.Printf("NOTIF: Creating a new Message Queue: %s\n", msg.Name)
 	var m sync.Mutex
 	newMq :=
 		&mq.MessageQueue{
-			Type:          msg.Type,
-			Name:          msg.Name,
-			Durable:       msg.Durable,
-			Connections:   map[string]*mq.ConsumerConnection{},
-			ConnectionIDs: []string{},
-			Notif:         make(chan struct{}),
-			Queue:         queue.Queue{},
-			M:             &m,
+			Type:            msg.Type,
+			Name:            msg.Name,
+			Durable:         msg.Durable,
+			Connections:     map[string]*mq.ConsumerConnection{},
+			ConnectionIDs:   []string{},
+			Notif:           make(chan struct{}),
+			Queue:           queue.Queue{},
+			M:               &m,
+			DeadConnections: map[string]string{},
 		}
 	table[msg.Name] = newMq
 	fmt.Printf("NOTIF: New Message queue created: %s\n", msg.Name)

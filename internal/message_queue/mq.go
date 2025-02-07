@@ -21,12 +21,13 @@ type MessageQueue struct {
 	// TODO Need to handle disconnected clients
 	// - Messages can only be pushed if there are connections
 	// - Messages enqueued and sent will not be availble afterwards
-	Connections   map[string]*ConsumerConnection
-	ConnectionIDs []string
-	Durable       bool
-	Queue         queue.Queue
-	Notif         chan struct{}
-	M             *sync.Mutex
+	Connections     map[string]*ConsumerConnection
+	ConnectionIDs   []string
+	DeadConnections map[string]string
+	Durable         bool
+	Queue           queue.Queue
+	Notif           chan struct{}
+	M               *sync.Mutex
 }
 type ConsumerConnection struct {
 	Conn         net.Conn
@@ -66,7 +67,6 @@ func (mq *MessageQueue) ListenMessages() {
 
 	for range mq.Notif {
 		// Handling disconnected clients
-		disconnectedClients := map[string]string{}
 
 		// Listener is notified when there are new consumers, and or there are new messages
 		// when message queue was full wit messages, and connections are present
@@ -95,28 +95,27 @@ func (mq *MessageQueue) ListenMessages() {
 				wg.Add(1)
 				conn, exists := mq.Connections[connID]
 				fmt.Printf("TEST_NOTIF: Sending Message #%d\n", i)
-				go sendMessage(&wg, conn, message.([]byte), disconnectedClients) // might cause race condition
 				fmt.Printf("TEST_NOTIF: Message sent for route %s: %+v\n", mq.Name, message.([]byte)[:4])
 				// if for some reason a dead connection exists when it shouldn't
 				// add it to disconnected clients for removal after sending messages
 				if !exists {
 					fmt.Println("ERROR: Connection does not exist, please remove it")
 					fmt.Println("TEST_ERROR: Appending connectionID to disconnected clients array")
-					disconnectedClients[connID] = connID
+					mq.removeDeadConnection(connID)
 					continue
 				}
+				go mq.sendMessage(&wg, conn, message.([]byte)) // might cause race condition
 			}
 		}
 		fmt.Println("TEST_NOTIF: Barrier Waiting for all messages to be sent by go routines...")
 		wg.Wait()
 		fmt.Println("TEST_NOTIF: All messages has been sent")
-		mq.removeDeadConnections(disconnectedClients)
 		mq.Log()
 	}
 }
 
 // TODO Need to be able to remove consumers from message queue if they are disconnected
-func sendMessage(wg *sync.WaitGroup, c *ConsumerConnection, message []byte, disconnectedClients map[string]string) {
+func (mq *MessageQueue) sendMessage(wg *sync.WaitGroup, c *ConsumerConnection, message []byte) {
 	defer wg.Done()
 	_, err := c.Conn.Write(message)
 	if err != nil {
@@ -125,11 +124,10 @@ func sendMessage(wg *sync.WaitGroup, c *ConsumerConnection, message []byte, disc
 
 			// Error returns "use of closed network connection"
 			// if connection was closed but wanting to write to it
-
 			fmt.Println(err.Error())
 			// Add disconnected clients into the map for clean up
-			fmt.Printf("TEST_NOTIF: Connection dead: %s", c.ConnectionID)
-			disconnectedClients[c.ConnectionID] = c.ConnectionID
+			fmt.Printf("TEST_NOTIF: Connection dead: %s\n", c.ConnectionID)
+			mq.removeDeadConnection(c.ConnectionID)
 		}
 		return
 	}
@@ -140,38 +138,23 @@ func sendMessage(wg *sync.WaitGroup, c *ConsumerConnection, message []byte, disc
 // if connectionID is a dead connection
 // move every element in connectionIDs from dead connection's index position + 1 to dead connection's index position
 // [1,2,3, dead, <- 5, 6, 7, dead, <- 9]
-func (mq *MessageQueue) removeDeadConnections(deadConnections map[string]string) {
+func (mq *MessageQueue) removeDeadConnection(deadConnID string) {
 	fmt.Println("TEST_NOTIF: Cleaning up dead connection...")
-	newConnectionIDsSlice := make([]string, len(mq.ConnectionIDs))
-	numOfDead := 0
+	mq.M.Lock()
+	defer mq.M.Unlock()
 	for i, connectionID := range mq.ConnectionIDs {
-		_, isDead := deadConnections[connectionID]
-		if isDead {
-			// append the before and after dead connection slices
-			// dead connection at ith index position
-			// extract elements before ith and after ith position
+		if connectionID == deadConnID {
 			fmt.Printf("TEST_NOTIF: Removing dead connection id: %s\n", connectionID)
-			fmt.Println("TEST_NOTIF: Removing dead connection net.Conn ^^^")
-
-			// Fix this out of bounds when `i` is first element (0-1 ) -> [:-1]
-			// if i == 0 return 0
-
 			before := mq.ConnectionIDs[:0]
 			if i > 0 {
 				before = mq.ConnectionIDs[:i-1]
 			}
-			newConnectionIDsSlice = append(before, mq.ConnectionIDs[i+1:]...)
-			delete(mq.Connections, connectionID) // Removes dead net.Conn from mq.Connections
-			numOfDead++
+			mq.ConnectionIDs = append(before, mq.ConnectionIDs[i+1:]...)
+			break
 		}
 	}
-	// BRUH ITS REMOVING EVEN THOUGH THERE ARE NO DEAD CONNECTIONS AAA
-	// Making sure that only when there are dead connections only then will we
-	// replace all of the connectionIDs
-	if len(deadConnections) > 0 {
-		mq.ConnectionIDs = newConnectionIDsSlice[:]
-	}
-	fmt.Printf("TEST_NOTIF: Number of dead connections removed: %d\n", numOfDead)
+	fmt.Println("TEST_NOTIF: Removing dead connection net.Conn ^^^")
+	delete(mq.Connections, deadConnID)
 	fmt.Printf("TEST_NOTIF: Connection IDs remaining: %d\n", len(mq.ConnectionIDs))
 	fmt.Printf("TEST_NOTIF: Connections remaining: %d\n", len(mq.Connections))
 }
