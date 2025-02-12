@@ -1,4 +1,4 @@
-# message-broker
+# msbq-server
 
 My own implementation of a messaging system and message queue protocol
 
@@ -16,7 +16,7 @@ using network socket via tcp, the `Connect(address string) Connection` which ret
 `StreamID`.
 
 You can find the client side here:
-API: https://github.com/francccisss/message-broker-endpoint-api
+API: https://github.com/francccisss/msbq-api
 
 #### Mudem (Multiplexer/Demultiplexer)
 
