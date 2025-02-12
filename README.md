@@ -1,6 +1,6 @@
 # message-broker
 
-My own implementation of a messaging system
+My own implementation of a messaging system and message queue protocol
 
 A message broker or a messaging system is an application integration pattern for inter-process communication for different services,
 these services or application endpoints' communication is facilitaed by using an application layer protocol.
@@ -14,6 +14,9 @@ This implementation uses a message queue system, the same way `amqp` works but a
 using network socket via tcp, the `Connect(address string) Connection` which returns a `Connection` interface which is used to create channels and streams,
 `Connect(address string) Connection` also spawns a Message demultiplexer, which is used to demultiplex different messages to different channels by reading the message's
 `StreamID`.
+
+You can find the client side here:
+API: https://github.com/francccisss/message-broker-endpoint-api
 
 #### Mudem (Multiplexer/Demultiplexer)
 
